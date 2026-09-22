@@ -12,7 +12,6 @@
 
 ![Aiko with a document open](docs/screenshot.png)
 
-![Aiko's home page](docs/screenshot-2.png)
 
 I built this because I wanted a simple PDF viewer that looked good. There is a
 [sample document](docs/sample.pdf) in this repo if you want something to open.
