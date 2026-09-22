@@ -31,6 +31,7 @@ public sealed partial class MainWindow : Window
     private ViewerPage?   viewer;
     private SubclassProc? activationHook;
     private bool          opening;
+    private bool          sized;
     private bool          printing;
 
     /// <summary>Builds the window with a Mica backdrop and the WinUI title bar, then shows the home page.</summary>
@@ -52,7 +53,18 @@ public sealed partial class MainWindow : Window
             current?.Dispose();
         };
         AppWindow.Changed += (_, _) => SizeCaptionSpacer();
-        Root.Loaded       += (_, _) => SizeCaptionSpacer();
+        Root.Loaded       += (_, _) =>
+        {
+            SizeCaptionSpacer();
+
+            // Sized again now the window is on a monitor and reports that monitor's scaling. Before it is shown
+            // it answers with the system default, which opened it four fifths of its size on a 125% display.
+            if (!sized)
+            {
+                sized = true;
+                RestoreWindowSize();
+            }
+        };
         ShowHome();
     }
 
@@ -89,11 +101,9 @@ public sealed partial class MainWindow : Window
 
         // Sizes are stored in device-independent pixels, so the window comes back the size it looked even on a
         // monitor with different scaling.
-        double scale = Content.XamlRoot?.RasterizationScale ?? 1;
+        double scale = DisplayScale;
         (int width, int height) = App.Settings.HasSize ? (App.Settings.Width, App.Settings.Height) : (1280, 860);
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(
-            (int)Math.Round(width * scale),
-            (int)Math.Round(height * scale)));
+        Resize((int)Math.Round(width * scale), (int)Math.Round(height * scale));
 
         if (App.Settings.IsMaximized)
         {
@@ -114,9 +124,29 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        double scale = Content.XamlRoot?.RasterizationScale ?? 1;
-        presenter.PreferredMinimumWidth  = (int)Math.Ceiling(Math.Max(widthDips, AppSettings.MinimumWidth) * scale);
-        presenter.PreferredMinimumHeight = (int)Math.Ceiling(heightDips * scale);
+        double scale = DisplayScale;
+        int    width  = (int)Math.Ceiling(Math.Max(widthDips, AppSettings.MinimumWidth) * scale);
+        int    height = (int)Math.Ceiling(heightDips * scale);
+        presenter.PreferredMinimumWidth  = width;
+        presenter.PreferredMinimumHeight = height;
+
+        // Grow now if the window is under the new minimum. Windows applies a minimum only on the next resize, so
+        // leaving it would let the window sit too small until the user happened to drag an edge, then jump.
+        if ((AppWindow.Size.Width < width) || (AppWindow.Size.Height < height))
+        {
+            Resize(Math.Max(AppWindow.Size.Width, width), Math.Max(AppWindow.Size.Height, height));
+        }
+    }
+
+    /// <summary>Sizes the window in physical pixels, never larger than the screen it is on.</summary>
+    /// <param name="width">Wanted width in physical pixels.</param>
+    /// <param name="height">Wanted height in physical pixels.</param>
+    private void Resize(int width, int height)
+    {
+        Windows.Graphics.RectInt32 work = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
+        AppWindow.Resize(new Windows.Graphics.SizeInt32(
+            Math.Min(width, work.Width),
+            Math.Min(height, work.Height)));
     }
 
     /// <summary>Remembers the restored size and whether the window was maximized, for the next launch.</summary>
@@ -128,7 +158,7 @@ public sealed partial class MainWindow : Window
         App.Settings.IsMaximized = maximized;
         if (!maximized)
         {
-            double scale        = Content.XamlRoot?.RasterizationScale ?? 1;
+            double scale        = DisplayScale;
             App.Settings.Width  = (int)Math.Round(AppWindow.Size.Width / scale);
             App.Settings.Height = (int)Math.Round(AppWindow.Size.Height / scale);
         }
@@ -410,10 +440,27 @@ public sealed partial class MainWindow : Window
         await dialog.ShowAsync();
     }
 
+    /// <summary>
+    /// How many physical pixels the display puts in a device-independent one. Taken from the window itself rather
+    /// than from XAML, which has no answer until the content has been measured: the window is sized before that,
+    /// and falling back to 1 there opened the first window at four fifths of its size on a scaled display.
+    /// </summary>
+    private double DisplayScale
+    {
+        get
+        {
+            uint dpi = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this));
+            return (dpi > 0) ? (dpi / 96.0) : (Content?.XamlRoot?.RasterizationScale ?? 1);
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(nint hWnd);
+
     /// <summary>Keeps the button row clear of the caption buttons, whose width the frame reports in physical pixels.</summary>
     private void SizeCaptionSpacer()
     {
-        double scale = Content.XamlRoot?.RasterizationScale ?? 1;
+        double scale = DisplayScale;
         CaptionSpacer.Width = AppWindow.TitleBar.RightInset / scale;
 
         // The title is centered across the whole window, so it has to stay clear of the buttons on both sides or

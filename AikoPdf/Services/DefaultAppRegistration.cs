@@ -32,7 +32,11 @@ public static class DefaultAppRegistration
     /// <param name="applicationUserModelId">The package's AUMID, family name and application id.</param>
     /// <returns>A deep link into Settings &gt; Default apps.</returns>
     public static Uri SettingsUriFor(string applicationUserModelId)
-        => new($"ms-settings:defaultapps?registeredAUMID={applicationUserModelId}");
+    {
+        // The id has to be escaped: Settings drops the app and shows the plain list when the "!" before the
+        // application id arrives unencoded.
+        return new Uri($"ms-settings:defaultapps?registeredAUMID={Uri.EscapeDataString(applicationUserModelId)}");
+    }
 
     /// <summary>Writes the registration under the given hive root.</summary>
     /// <param name="root">Normally <c>Registry.CurrentUser</c>; tests pass a throwaway key.</param>

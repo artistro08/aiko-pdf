@@ -47,9 +47,10 @@ public sealed class DefaultAppRegistrationTests : IDisposable
     [Fact]
     public void SettingsUriFor_PointsAtThePackagedApp()
     {
+        // The "!" is escaped: Settings ignores the app and shows the whole list when it is not.
         Assert.Equal(
-            "ms-settings:defaultapps?registeredAUMID=Artistro08.Aiko_abc123!Aiko",
-            DefaultAppRegistration.SettingsUriFor("Artistro08.Aiko_abc123!Aiko").ToString());
+            "ms-settings:defaultapps?registeredAUMID=Artistro08.Aiko_abc123%21Aiko",
+            DefaultAppRegistration.SettingsUriFor("Artistro08.Aiko_abc123!Aiko").OriginalString);
     }
 
     [Fact]
