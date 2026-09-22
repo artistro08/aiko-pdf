@@ -3,6 +3,7 @@ using AikoPdf.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 
@@ -25,8 +26,53 @@ public sealed partial class HomePage : Page
             App.Recent.Prune();
             App.Recent.Changed += Refresh;
             Refresh();
+            FadeScrolledContent();
         };
+        RecentSection.SizeChanged += (_, _) => FadeScrolledContent();
         Unloaded += (_, _) => App.Recent.Changed -= Refresh;
+    }
+
+    /// <summary>
+    /// Softens the top edge of the card list, so a card scrolling up disappears under the heading instead of being
+    /// cut off at it. The mask is a gradient over the scroller's own pixels, which the compositor applies; the
+    /// cards underneath stay where they are and still take clicks.
+    /// </summary>
+    private void FadeScrolledContent()
+    {
+        // How far down the fade reaches, in device-independent pixels.
+        const float FadeHeight = 20;
+
+        var size = new System.Numerics.Vector2((float)RecentSection.ActualWidth, (float)RecentSection.ActualHeight);
+        if ((size.X <= 0) || (size.Y <= 0))
+        {
+            return;
+        }
+
+        Microsoft.UI.Composition.Visual visual = ElementCompositionPreview.GetElementVisual(RecentSection);
+        Microsoft.UI.Composition.Compositor compositor = visual.Compositor;
+
+        Microsoft.UI.Composition.CompositionLinearGradientBrush gradient = compositor.CreateLinearGradientBrush();
+        gradient.StartPoint = new System.Numerics.Vector2(0, 0);
+        gradient.EndPoint   = new System.Numerics.Vector2(0, FadeHeight / size.Y);
+        gradient.MappingMode = Microsoft.UI.Composition.CompositionMappingMode.Relative;
+        gradient.ColorStops.Add(compositor.CreateColorGradientStop(0, Windows.UI.Color.FromArgb(0, 255, 255, 255)));
+        gradient.ColorStops.Add(compositor.CreateColorGradientStop(1, Windows.UI.Color.FromArgb(255, 255, 255, 255)));
+
+        Microsoft.UI.Composition.CompositionVisualSurface surface = compositor.CreateVisualSurface();
+        surface.SourceVisual = visual;
+        surface.SourceSize   = size;
+
+        Microsoft.UI.Composition.CompositionMaskBrush mask = compositor.CreateMaskBrush();
+        mask.Source = compositor.CreateSurfaceBrush(surface);
+        mask.Mask   = gradient;
+
+        Microsoft.UI.Composition.SpriteVisual sprite = compositor.CreateSpriteVisual();
+        sprite.Size  = size;
+        sprite.Brush = mask;
+
+        // The real scroller keeps taking input while the masked copy is what the reader sees.
+        visual.Opacity = 0;
+        ElementCompositionPreview.SetElementChildVisual(RecentFade, sprite);
     }
 
     /// <summary>Formats a last-opened time for the card, in the user's short date and time format.</summary>
@@ -53,7 +99,7 @@ public sealed partial class HomePage : Page
         // With nothing to list, the recent half collapses and the welcome block takes the whole window. Otherwise
         // the welcome block gets the top half, or its own height when the window is too short for that.
         RecentGrid.ItemsSource    = App.Recent.Items.ToList();
-        RecentSection.Visibility  = empty ? Visibility.Collapsed : Visibility.Visible;
+        RecentIsland.Visibility   = empty ? Visibility.Collapsed : Visibility.Visible;
         RecentRow.Height          = empty ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
         WelcomeRow.Height         = empty ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
         WelcomeRow.MinHeight      = empty ? 0 : ActualHeight / 2;

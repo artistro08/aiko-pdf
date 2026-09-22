@@ -6,6 +6,11 @@
     xmlns:local="using:AikoPdf.Pages"
     xmlns:services="using:AikoPdf.Services">
 
+    <Page.Resources>
+        <!-- Same fill as the viewer's thumbnail island, so the two panels read as one family -->
+        <SolidColorBrush x:Key="IslandFillBrush" Color="#000000" Opacity="0.18" />
+    </Page.Resources>
+
     <Grid SizeChanged="OnPageSizeChanged">
         <Grid.RowDefinitions>
             <RowDefinition x:Name="WelcomeRow" Height="Auto" />
@@ -68,19 +73,32 @@
         </ScrollViewer>
         <!-- /Welcome -->
 
-        <!-- Recent: small cards, left-aligned in the bottom half -->
-        <ScrollViewer x:Name="RecentSection" Grid.Row="1">
+        <!-- Recent: small cards on their own panel, left-aligned in the bottom half -->
+        <Border
+            x:Name="RecentIsland"
+            Grid.Row="1"
+            Margin="12,0,12,12"
+            CornerRadius="6"
+            Background="{StaticResource IslandFillBrush}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- The heading stays put while the cards scroll under it -->
+            <TextBlock
+                x:Name="RecentHeader"
+                Text="Recent"
+                Margin="20,16,20,4"
+                Style="{StaticResource SubtitleTextBlockStyle}" />
+
+            <ScrollViewer x:Name="RecentSection" Grid.Row="1">
             <StackPanel
                 MaxWidth="1040"
-                Margin="32,8,32,24"
+                Margin="20,0,20,16"
                 HorizontalAlignment="Stretch"
                 Spacing="8">
-                <TextBlock
-                    x:Name="RecentHeader"
-                    Text="Recent"
-                    Margin="0,0,0,4"
-                    Style="{StaticResource SubtitleTextBlockStyle}" />
-
                 <InfoBar
                     x:Name="Notice"
                     Severity="Warning"
@@ -153,7 +171,12 @@
                     </ItemsRepeater.ItemTemplate>
                 </ItemsRepeater>
             </StackPanel>
-        </ScrollViewer>
+            </ScrollViewer>
+
+            <!-- Holds the masked copy of the list that the reader actually sees -->
+            <Border x:Name="RecentFade" Grid.Row="1" IsHitTestVisible="False" />
+        </Grid>
+        </Border>
         <!-- /Recent -->
     </Grid>
 </Page>

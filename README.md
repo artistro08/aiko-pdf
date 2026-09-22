@@ -17,15 +17,20 @@ I built this because I wanted a simple PDF viewer that looked good. There is a
 
 ## Installing
 
-Download `Aiko-<version>-x64.msix` and `Aiko.cer` from [Releases](https://github.com/artistro08/aiko-pdf/releases),
-then run:
+Download `Aiko-<version>-x64.msix` and `Aiko.cer` from [Releases](https://github.com/artistro08/aiko-pdf/releases).
 
-```powershell
-pwsh -File tools/install.ps1 -Package Aiko-1.0.0-x64.msix
-```
+Aiko is signed with my own certificate, so Windows needs to be told once that it trusts it:
 
-The package is signed with my own certificate, so Windows needs it trusted once, which the script does. Prefer not
-to install anything? The zip in the same release is the whole app in a folder: unzip it and run `AikoPdf.exe`.
+1. Double-click **Aiko.cer** and choose **Install Certificate**.
+2. Pick **Local Machine**, then **Yes** at the prompt for administrator rights.
+3. Choose **Place all certificates in the following store**, **Browse**, then **Trusted People**.
+4. **Next**, then **Finish**. Windows says the import succeeded.
+5. Double-click **Aiko-<version>-x64.msix** and choose **Install**.
+
+That is it. Aiko is in the Start menu and offered for PDFs under **Open with**.
+
+> Prefer not to install anything? The zip in the same release is the whole app in a folder. Unzip it and run
+> `AikoPdf.exe`.
 
 ## Building
 
@@ -36,7 +41,7 @@ dotnet build AikoPdf/AikoPdf.csproj -p:Platform=x64
 dotnet test tests/AikoPdf.Tests/AikoPdf.Tests.csproj
 ```
 
-The build is unpackaged and self-contained, so the output folder runs as-is. To cut a release zip and installer:
+The build is unpackaged and self-contained, so the output folder runs as-is. To cut a release package and zip:
 
 ```bash
 pwsh -File tools/build-release.ps1

@@ -22,6 +22,12 @@ public sealed class AppSettings
     /// <summary>Narrowest window the app allows, in device-independent pixels; the height comes from the home page's content.</summary>
     public const int MinimumWidth = 720;
 
+    /// <summary>Size of the window the first time the app runs, in device-independent pixels.</summary>
+    public const int DefaultWidth  = 720;
+
+    /// <summary>Height of the window the first time the app runs, in device-independent pixels.</summary>
+    public const int DefaultHeight = 648;
+
     /// <summary>Shortest window a saved size is trusted at, in device-independent pixels.</summary>
     public const int MinimumHeight = 520;
 

@@ -1,8 +1,9 @@
 # Builds the shippable Aiko artifacts into dist\:
 #
-#   Aiko-<version>-x64.msix   the installer most people should use
-#   Aiko-<version>-x64.zip    the same app as a folder, for running without installing
-#   Aiko.cer                  the certificate the MSIX is signed with, needed once to install it
+#   Aiko-<version>-x64.msix   the app
+#   Aiko.cer                  the certificate the MSIX is signed with, which a person installs into Trusted
+#                             People (double-click, Install Certificate, Local Machine, Trusted People) before
+#                             the package will install
 #
 # Used to cut a GitHub release. The package is laid out by the MSIX tooling in the build itself, because a package
 # built by hand out of the unpackaged output cannot resolve the app's XAML under package identity. Signing uses
@@ -23,7 +24,6 @@ $root     = Split-Path -Parent $PSScriptRoot
 $project  = Join-Path $root 'AikoPdf\AikoPdf.csproj'
 $manifest = Join-Path $root 'AikoPdf\Package.appxmanifest'
 $dist     = Join-Path $root 'dist'
-$payload  = Join-Path $root "AikoPdf\bin\x64\$Configuration\net9.0-windows10.0.26100.0\win-x64\publish"
 $packages = Join-Path $root 'AikoPdf\AppPackages'
 
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
@@ -50,20 +50,8 @@ if (-not $SkipTests) {
     if ($LASTEXITCODE -ne 0) { throw 'tests failed' }
 }
 
-# The portable build: a self-contained folder that runs from anywhere.
-Write-Host 'Publishing x64...' -ForegroundColor Cyan
-if (Test-Path $payload) { Remove-Item -Recurse -Force $payload }
-dotnet publish $project -c $Configuration -p:Platform=x64 -r win-x64 --self-contained true `
-    -p:Version="$Version.0" -o $payload --nologo
-if ($LASTEXITCODE -ne 0) { throw 'publish failed' }
-
-$zip = Join-Path $dist "Aiko-$Version-x64.zip"
-Write-Host "Zipping to $zip..." -ForegroundColor Cyan
-if (Test-Path $zip) { Remove-Item $zip -Force }
-Compress-Archive -Path (Join-Path $payload '*') -DestinationPath $zip -CompressionLevel Optimal
-
-# The package: same code, built again with the MSIX tooling so the layout and the resource index carry the
-# package identity from Package.appxmanifest.
+# The package is laid out by the MSIX tooling so its resource index carries the package identity from
+# Package.appxmanifest.
 Write-Host 'Building MSIX...' -ForegroundColor Cyan
 # The manifest is a checked-in file, so the version goes in for the build and comes straight back out: a release
 # build must not leave the working tree dirty. It is written without a byte order mark whichever PowerShell runs

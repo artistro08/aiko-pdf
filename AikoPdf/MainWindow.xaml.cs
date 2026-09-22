@@ -4,6 +4,7 @@ using AikoPdf.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Windowing;
 using UglyToad.PdfPig.Exceptions;
@@ -26,6 +27,9 @@ namespace AikoPdf;
 public sealed partial class MainWindow : Window
 {
     private const string AppName = "Aiko";
+
+    // How long the home page takes to appear when it follows a dialog rather than a reader's own click.
+    private const int FadeMilliseconds = 250;
 
     private PdfSession?   current;
     private ViewerPage?   viewer;
@@ -91,10 +95,12 @@ public sealed partial class MainWindow : Window
                 await OpenFileAsync(startupFile);
 
                 // A file that could not be opened (wrong password, damaged, gone) leaves an empty frame, so fall
-                // back to the page the app would have shown anyway.
+                // back to the page the app would have shown anyway. It fades in, because it arrives as an answer
+                // to the dialog the reader just dismissed rather than as the page they asked for.
                 if (RootFrame.Content is null)
                 {
                     ShowHome();
+                    FadeIn(RootFrame);
                 }
             };
         }
@@ -134,7 +140,9 @@ public sealed partial class MainWindow : Window
         // Sizes are stored in device-independent pixels, so the window comes back the size it looked even on a
         // monitor with different scaling.
         double scale = DisplayScale;
-        (int width, int height) = App.Settings.HasSize ? (App.Settings.Width, App.Settings.Height) : (1280, 860);
+        (int width, int height) = App.Settings.HasSize
+            ? (App.Settings.Width, App.Settings.Height)
+            : (AppSettings.DefaultWidth, AppSettings.DefaultHeight);
         Resize((int)Math.Round(width * scale), (int)Math.Round(height * scale));
 
         if (App.Settings.IsMaximized)
@@ -168,6 +176,29 @@ public sealed partial class MainWindow : Window
         {
             Resize(Math.Max(AppWindow.Size.Width, width), Math.Max(AppWindow.Size.Height, height));
         }
+    }
+
+    /// <summary>
+    /// Brings an element up from nothing, so a page that replaces a dialog does not snap into place. Driven
+    /// straight from the compositor: a XAML storyboard over the same property jumped to the end instead of
+    /// running.
+    /// </summary>
+    /// <param name="element">What to fade in.</param>
+    private static void FadeIn(UIElement element)
+    {
+        Microsoft.UI.Composition.Visual visual = ElementCompositionPreview.GetElementVisual(element);
+        Microsoft.UI.Composition.Compositor compositor = visual.Compositor;
+
+        Microsoft.UI.Composition.ScalarKeyFrameAnimation animation = compositor.CreateScalarKeyFrameAnimation();
+        animation.InsertKeyFrame(0, 0);
+        animation.InsertKeyFrame(
+            1,
+            1,
+            compositor.CreateCubicBezierEasingFunction(new System.Numerics.Vector2(0.25f, 0.1f), new System.Numerics.Vector2(0.25f, 1f)));
+        animation.Duration = TimeSpan.FromMilliseconds(FadeMilliseconds);
+
+        visual.Opacity = 0;
+        visual.StartAnimation("Opacity", animation);
     }
 
     /// <summary>Sizes the window in physical pixels, never larger than the screen it is on.</summary>
@@ -374,7 +405,10 @@ public sealed partial class MainWindow : Window
         {
             // Callers fire and forget, so a failure here would otherwise vanish with the task.
             App.Log($"Failed to show {path}: {ex}");
-            await ShowErrorAsync("Can't show this file", $"Something went wrong while opening \"{Path.GetFileName(path)}\".");
+            await ShowErrorAsync(
+                "Can't show this file",
+                $"Something went wrong while opening \"{Path.GetFileName(path)}\".",
+                ex.Message);
         }
         finally
         {
@@ -419,13 +453,13 @@ public sealed partial class MainWindow : Window
             catch (FileNotFoundException)
             {
                 App.Recent.Remove(path);
-                await ShowErrorAsync("File not found", $"\"{name}\" has been moved or deleted.");
+                await ShowErrorAsync("File not found", $"We can't find \"{name}\". It may have been moved or deleted.");
                 return null;
             }
             catch (Exception ex) when (ExceptionFilters.IsRecoverable(ex))
             {
                 App.Log($"Failed to open {path}: {ex}");
-                await ShowErrorAsync("Can't open this file", $"\"{name}\" isn't a PDF this app can read. It may be damaged.");
+                await ShowErrorAsync("Can't open this file", $"\"{name}\" can't be opened. It may be damaged.");
                 return null;
             }
         }
@@ -460,15 +494,31 @@ public sealed partial class MainWindow : Window
         return (result == ContentDialogResult.Primary) ? box.Password : null;
     }
 
-    private async Task ShowErrorAsync(string title, string message)
+    /// <summary>Shows a dialog explaining a failure in plain words, with an OK the reader can press blind.</summary>
+    /// <param name="title">What went wrong, in a few words.</param>
+    /// <param name="message">The explanation, naming the file.</param>
+    /// <param name="detail">What the failure itself said, shown under the message. Omitted when there is none.</param>
+    private async Task ShowErrorAsync(string title, string message, string? detail = null)
     {
+        var lines = new StackPanel { Spacing = 8 };
+        lines.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
+        if (!string.IsNullOrWhiteSpace(detail))
+        {
+            lines.Children.Add(new TextBlock
+            {
+                Text         = detail,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground   = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            });
+        }
+
         var dialog = new ContentDialog
         {
-            XamlRoot            = Content.XamlRoot,
-            Title               = title,
-            Content             = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
-            PrimaryButtonText   = "OK",
-            DefaultButton       = ContentDialogButton.Primary,
+            XamlRoot          = Content.XamlRoot,
+            Title             = title,
+            Content           = lines,
+            PrimaryButtonText = "OK",
+            DefaultButton     = ContentDialogButton.Primary,
         };
         await dialog.ShowAsync();
     }
