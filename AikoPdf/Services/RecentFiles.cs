@@ -88,6 +88,7 @@ public sealed class RecentFiles
     /// <param name="path">Full path of the file just opened.</param>
     public void Add(string path)
     {
+        Reload();
         string full = Full(path);
         items.RemoveAll(f => string.Equals(f.Path, full, StringComparison.OrdinalIgnoreCase));
         items.Insert(0, new RecentFile(full, DateTimeOffset.Now));
@@ -103,6 +104,7 @@ public sealed class RecentFiles
     /// <param name="path">Path of the file, in any form <see cref="Path.GetFullPath(string)"/> accepts.</param>
     public void Remove(string path)
     {
+        Reload();
         string full = Full(path);
         if (items.RemoveAll(f => string.Equals(f.Path, full, StringComparison.OrdinalIgnoreCase)) > 0)
         {
@@ -117,10 +119,22 @@ public sealed class RecentFiles
     /// </summary>
     public void Prune()
     {
+        Reload();
         if (items.RemoveAll(f => VolumeIsPresent(f.Path) && !File.Exists(f.Path)) > 0)
         {
             Save();
         }
+    }
+
+    /// <summary>
+    /// Picks up what other windows have written before changing the list. Each open document is its own process
+    /// and they all share one file, so without this the last one to save would drop everything the others added.
+    /// </summary>
+    private void Reload()
+    {
+        RecentFiles saved = Load(storePath);
+        items.Clear();
+        items.AddRange(saved.items);
     }
 
     /// <summary>True when the drive or share an entry lives on is reachable at the moment.</summary>

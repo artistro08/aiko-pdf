@@ -171,7 +171,10 @@ public sealed partial class MainWindow : Window
         {
             try
             {
-                await Windows.System.Launcher.LaunchUriAsync(DefaultAppRegistration.SettingsUri);
+                Uri settings = App.IsPackaged
+                    ? DefaultAppRegistration.SettingsUriFor(App.ApplicationUserModelId)
+                    : DefaultAppRegistration.SettingsUri;
+                await Windows.System.Launcher.LaunchUriAsync(settings);
             }
             catch (Exception ex) when (ExceptionFilters.IsRecoverable(ex))
             {

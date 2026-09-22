@@ -107,4 +107,20 @@ public sealed class RecentFilesTests : IDisposable
 
         Assert.Equal(2, fired);
     }
+
+    [Fact]
+    public void Add_KeepsWhatAnotherWindowSavedInTheMeantime()
+    {
+        var first  = new RecentFiles(StorePath);
+        var second = new RecentFiles(StorePath);
+        first.Add(@"C:\docs\one.pdf");
+
+        // The second list was loaded before that and knows nothing about it, as a second window would not.
+        second.Add(@"C:\docs\two.pdf");
+
+        RecentFiles reloaded = RecentFiles.Load(StorePath);
+        Assert.Equal(2, reloaded.Items.Count);
+        Assert.Contains(reloaded.Items, f => f.Name == "one.pdf");
+        Assert.Contains(reloaded.Items, f => f.Name == "two.pdf");
+    }
 }
