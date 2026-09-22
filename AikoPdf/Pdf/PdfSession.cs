@@ -51,6 +51,7 @@ public sealed class PdfSession : IDisposable
     /// <returns>The open session.</returns>
     /// <exception cref="PdfDocumentEncryptedException">The file needs a password, or the one given is wrong.</exception>
     /// <exception cref="IOException">The file can't be read.</exception>
+    /// <exception cref="NotSupportedException">The password worked but Windows can't open this kind of encryption.</exception>
     /// <exception cref="Exception">Windows can't open the file as a PDF (COM error from the PDF engine).</exception>
     public static async Task<PdfSession> OpenAsync(string path, string? password = null)
     {
@@ -75,6 +76,14 @@ public sealed class PdfSession : IDisposable
         {
             PdfRenderer renderer = await PdfRenderer.OpenAsync(path, password);
             return new PdfSession(path, renderer, textLayer);
+        }
+        catch (Exception ex) when ((textLayer is not null) && (password is not null) && ExceptionFilters.IsRecoverable(ex))
+        {
+            // The password was right, because PdfPig read the file with it, and Windows still refused: its PDF
+            // engine handles the older encryption but not AES-256, the one PDF 2.0 tools write. Saying the file
+            // may be damaged would send the reader looking for a problem that isn't there.
+            textLayer.Dispose();
+            throw new NotSupportedException("The PDF uses protection the Windows PDF engine can't open.", ex);
         }
         catch
         {

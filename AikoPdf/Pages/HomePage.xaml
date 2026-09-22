@@ -90,7 +90,7 @@
             <TextBlock
                 x:Name="RecentHeader"
                 Text="Recent"
-                Margin="20,16,20,4"
+                Margin="20,16,20,12"
                 Style="{StaticResource SubtitleTextBlockStyle}" />
 
             <ScrollViewer x:Name="RecentSection" Grid.Row="1">

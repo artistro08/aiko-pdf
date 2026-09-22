@@ -450,6 +450,13 @@ public sealed partial class MainWindow : Window
                     return null;
                 }
             }
+            catch (NotSupportedException)
+            {
+                await ShowErrorAsync(
+                    "Can't open this file",
+                    $"\"{name}\" is protected in a way Windows can't open, even with the right password.");
+                return null;
+            }
             catch (FileNotFoundException)
             {
                 App.Recent.Remove(path);

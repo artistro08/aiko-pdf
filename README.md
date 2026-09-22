@@ -29,9 +29,6 @@ Aiko is signed with my own certificate, so Windows needs to be told once that it
 
 That is it. Aiko is in the Start menu and offered for PDFs under **Open with**.
 
-> Prefer not to install anything? The zip in the same release is the whole app in a folder. Unzip it and run
-> `AikoPdf.exe`.
-
 ## Building
 
 You need the .NET 9 SDK and the Visual Studio 2022 build tools for the XAML compiler.
@@ -41,7 +38,7 @@ dotnet build AikoPdf/AikoPdf.csproj -p:Platform=x64
 dotnet test tests/AikoPdf.Tests/AikoPdf.Tests.csproj
 ```
 
-The build is unpackaged and self-contained, so the output folder runs as-is. To cut a release package and zip:
+The app carries its own copy of the runtime, so a build runs on any supported PC as-is. To cut a release:
 
 ```bash
 pwsh -File tools/build-release.ps1
