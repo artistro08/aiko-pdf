@@ -36,6 +36,7 @@ public sealed partial class MainWindow : Window
     private SubclassProc? activationHook;
     private bool          opening;
     private bool          sized;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? sizeSave;
     private bool          opened;
     private bool          printing;
 
@@ -61,7 +62,19 @@ public sealed partial class MainWindow : Window
             SaveWindowSize();
             current?.Dispose();
         };
-        AppWindow.Changed += (_, _) => SizeCaptionSpacer();
+        AppWindow.Changed += (_, args) =>
+        {
+            SizeCaptionSpacer();
+
+            // Saved as it changes, not only on close: every PDF opened from Explorer starts its own window, and
+            // it should come up the size of the one already open rather than the size the last one closed at.
+            if (sized && (args.DidSizeChange || args.DidPresenterChange))
+            {
+                sizeSave ??= CreateSizeSaveTimer();
+                sizeSave.Stop();
+                sizeSave.Start();
+            }
+        };
         Root.Loaded       += (_, _) =>
         {
             SizeCaptionSpacer();
@@ -212,6 +225,17 @@ public sealed partial class MainWindow : Window
             Math.Min(height, work.Height)));
     }
 
+    /// <summary>A short timer that saves the window size once a drag has settled, so a resize isn't a stream of writes.</summary>
+    /// <returns>The timer, stopped.</returns>
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer CreateSizeSaveTimer()
+    {
+        Microsoft.UI.Dispatching.DispatcherQueueTimer timer = DispatcherQueue.CreateTimer();
+        timer.Interval    = TimeSpan.FromMilliseconds(400);
+        timer.IsRepeating = false;
+        timer.Tick       += (_, _) => SaveWindowSize();
+        return timer;
+    }
+
     /// <summary>Remembers the restored size and whether the window was maximized, for the next launch.</summary>
     private void SaveWindowSize()
     {
@@ -332,7 +356,7 @@ public sealed partial class MainWindow : Window
     public void AttachViewer(ViewerPage page)
     {
         viewer                                = page;
-        AppTitleBar.IsPaneToggleButtonVisible = true;
+        PaneToggle.Visibility                 = Visibility.Visible;
         OpenButton.Visibility                 = Visibility.Visible;
         OpenWithButton.Visibility             = Visibility.Visible;
         ShowInFolderButton.Visibility         = Visibility.Visible;
@@ -343,7 +367,7 @@ public sealed partial class MainWindow : Window
     {
         viewer                                = null;
         DocumentTitle.Text                    = string.Empty;
-        AppTitleBar.IsPaneToggleButtonVisible = false;
+        PaneToggle.Visibility                 = Visibility.Collapsed;
         OpenButton.Visibility                 = Visibility.Collapsed;
         OpenWithButton.Visibility             = Visibility.Collapsed;
         ShowInFolderButton.Visibility         = Visibility.Collapsed;
@@ -553,10 +577,6 @@ public sealed partial class MainWindow : Window
         double scale = DisplayScale;
         CaptionSpacer.Width = AppWindow.TitleBar.RightInset / scale;
 
-        // The title is centered across the whole window, so it has to stay clear of the buttons on both sides or
-        // a long file name runs underneath them.
-        double clear = TitleButtons.ActualWidth + CaptionSpacer.Width + 16;
-        DocumentTitle.MaxWidth = Math.Max(120, (AppWindow.Size.Width / scale) - (2 * clear));
     }
 
     // =========================================================================
@@ -585,6 +605,7 @@ public sealed partial class MainWindow : Window
             double opacity = active ? 1 : (double)Application.Current.Resources["TitleBarDeactivatedOpacity"];
             DocumentTitle.Opacity = opacity;
             TitleButtons.Opacity  = opacity;
+            PaneToggle.Opacity    = opacity;
         }
 
         return DefSubclassProc(hWnd, msg, wParam, lParam);
@@ -603,7 +624,7 @@ public sealed partial class MainWindow : Window
     // INPUT: TITLE BAR, SHORTCUT AND DRAG-DROP
     // =========================================================================
 
-    private void OnPaneToggleRequested(TitleBar sender, object args) => viewer?.ToggleSidebar();
+    private void OnPaneToggleClick(object sender, RoutedEventArgs e) => viewer?.ToggleSidebar();
 
     private void OnOpenClick(object sender, RoutedEventArgs e) => _ = PickAndOpenAsync();
 
@@ -635,6 +656,12 @@ public sealed partial class MainWindow : Window
         try
         {
             await DocumentPrinter.PrintAsync(this, current);
+        }
+        catch (PrintSpoolerStoppedException)
+        {
+            await ShowErrorAsync(
+                "Can't print",
+                "Printing is turned off on this PC. Open Services, start Print Spooler, then try again.");
         }
         catch (Exception ex) when (ExceptionFilters.IsRecoverable(ex))
         {

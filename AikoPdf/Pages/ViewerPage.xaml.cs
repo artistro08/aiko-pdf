@@ -60,6 +60,8 @@ public sealed partial class ViewerPage : Page
     /// <summary>Slides the sidebar island out to the left while its column closes, and back in when it opens.</summary>
     public Microsoft.UI.Xaml.Media.TranslateTransform SidebarSlide { get; } = new();
     private PdfPageView? selectionPage;
+    private int          renderedPages;
+    private Microsoft.UI.Xaml.Media.Animation.Storyboard? coverFade;
     private bool         sidebarOpen = true;
     private Microsoft.UI.Xaml.Media.Animation.Storyboard? sidebarSlide;
     private bool         syncingThumbnail;
@@ -75,6 +77,35 @@ public sealed partial class ViewerPage : Page
         Loaded += OnLoaded;
     }
 
+    /// <summary>
+    /// Counts pages as their first bitmap lands and lifts the loading cover once enough are in: ten, or every page
+    /// of a shorter document. By then the pages right around the reader are ready and the rest fill in far ahead
+    /// of any scrolling.
+    /// </summary>
+    private void OnPageFirstRendered(PdfPageView page)
+    {
+        const int PagesBeforeReading = 10;
+
+        renderedPages++;
+        if ((LoadingCover.Visibility == Visibility.Collapsed) || (renderedPages < Math.Min(PagesBeforeReading, pages.Count)))
+        {
+            return;
+        }
+
+        var fade = new Microsoft.UI.Xaml.Media.Animation.DoubleAnimation
+        {
+            To       = 0,
+            Duration = new Duration(TimeSpan.FromMilliseconds(200)),
+        };
+        Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTarget(fade, LoadingCover);
+        Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTargetProperty(fade, "Opacity");
+
+        coverFade = new Microsoft.UI.Xaml.Media.Animation.Storyboard();
+        coverFade.Children.Add(fade);
+        coverFade.Completed += (_, _) => LoadingCover.Visibility = Visibility.Collapsed;
+        coverFade.Begin();
+    }
+
     /// <summary>Receives the open document and lays out its pages.</summary>
     /// <param name="e">Carries the <see cref="PdfSession"/> as its parameter.</param>
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -88,6 +119,7 @@ public sealed partial class ViewerPage : Page
         {
             var view = new PdfPageView(session, n);
             view.SelectionStarted += OnSelectionStarted;
+            view.FirstRendered    += OnPageFirstRendered;
             pages.Add(view);
             PageStack.Children.Add(view);
         }

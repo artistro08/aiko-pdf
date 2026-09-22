@@ -19,28 +19,31 @@ namespace AikoPdf.Controls;
 /// The bitmap is rendered above the on-screen pixel size (zoom times display scale times an oversampling
 /// factor), so it downscales cleanly: text keeps an even weight while a zoom or resize stretches the old bitmap,
 /// and the fresh render that lands once the size has settled is not a visible switch from soft to sharp.
-/// A page keeps a bitmap for the life of the document so nothing ever scrolls into view blank: pages near the
-/// viewport hold a full-quality one, the rest hold a small one of a few hundred KB and upgrade as they come near.
+/// A page keeps a bitmap for the life of the document so nothing ever scrolls into view blank or soft: pages near
+/// the viewport hold one with extra pixels, the rest hold one at the on-screen size.
 /// </summary>
 /// <remarks>
 /// @author Devin Green (Artistro08)
 /// </remarks>
 public sealed partial class PdfPageView : UserControl
 {
-    // Every page keeps a bitmap for the life of the document, so nothing ever scrolls into view blank. Pages
-    // within this distance of the viewport (in DIPs) hold a full-quality one; the rest hold a small one that is
-    // enough to recognize the page and costs a few hundred KB, and they upgrade as they come near.
+    // Every page keeps a bitmap for the life of the document, so nothing ever scrolls into view blank or soft.
+    // Pages within this distance of the viewport (in DIPs) hold one with extra pixels for smooth resizing; the
+    // rest hold one at exactly the on-screen size, which is just as sharp standing still.
     private const double NearDistance = 2000;
 
-    // Full-quality bitmaps carry twice the on-screen pixels: downscaling from there averages the text's edges,
-    // so a page stretched by a resize looks the same as a fresh render, instead of flipping between thin and
-    // bold. Far pages keep a quarter of the on-screen pixels.
+    // Near bitmaps carry twice the on-screen pixels: downscaling from there averages the text's edges, so a page
+    // stretched by a resize looks the same as a fresh render, instead of flipping between thin and bold. Far
+    // bitmaps are one to one. A quarter-size far bitmap used to show for a second as a blurred page whenever a
+    // reader scrolled faster than the renders could keep up.
     private const double NearOversample = 2.0;
-    private const double FarOversample  = 0.5;
+    private const double FarOversample  = 1.0;
 
-    // A far page's bitmap is only there to be recognizable, so it is capped in absolute pixels. Without the cap it
-    // grew with the zoom, and 800% on a long document held a full-size bitmap for every page in the file.
-    private const double FarMaxPixelWidth = 400;
+    // Far bitmaps stop growing here, so 800% zoom on a long document doesn't hold a poster-sized bitmap for every
+    // page. At any ordinary zoom a page is narrower than this and renders at full sharpness.
+    // ponytail: a 100-page file at fit width holds roughly 800 MB of far bitmaps; drop far pages past a few
+    // hundred pages away if long documents run short of memory.
+    private const double FarMaxPixelWidth = 2400;
 
     // Near pages render before far ones: far renders wait while any near render is in flight.
     private static int nearRendersInFlight;
@@ -58,6 +61,9 @@ public sealed partial class PdfPageView : UserControl
     private CancellationTokenSource? renderCancellation;
     private IReadOnlyList<TextGlyph>? glyphs;
     private bool                     loadingGlyphs;
+    private int                      clickCount;
+    private ulong                    lastClickTime;
+    private Point                    lastClickPoint;
     private TextSelection?           selection;
     private bool                     dragging;
     private double?                  anchorFraction;
@@ -84,6 +90,12 @@ public sealed partial class PdfPageView : UserControl
 
     /// <summary>Raised when a drag selection starts on this page, so the viewer can clear the selection on any other page.</summary>
     public event Action<PdfPageView>? SelectionStarted;
+
+    /// <summary>Raised once, when the page shows its first bitmap. The viewer counts these to lift its loading cover.</summary>
+    public event Action<PdfPageView>? FirstRendered;
+
+    /// <summary>True once the page has shown a bitmap.</summary>
+    public bool HasRendered { get; private set; }
 
     /// <summary>1-based page number.</summary>
     public int PageNumber { get; }
@@ -246,6 +258,11 @@ public sealed partial class PdfPageView : UserControl
 
             PageImage.Source   = bitmap;
             renderedPixelWidth = pixelWidth;
+            if (!HasRendered)
+            {
+                HasRendered = true;
+                FirstRendered?.Invoke(this);
+            }
 
             // The white placeholder is only for the wait before the first render; once the bitmap is in, its own
             // background shows, and no white edge can peek out around a dark page.
@@ -314,10 +331,62 @@ public sealed partial class PdfPageView : UserControl
         }
 
         SelectionStarted?.Invoke(this);
-        selection.Begin(ToPagePoint(point.Position));
-        RedrawSelection();
-        dragging = CapturePointer(e.Pointer);
+        Point pagePoint = ToPagePoint(point.Position);
+
+        // Presses close together in time and place count up the way Windows counts them: a double-click takes
+        // the word, a triple-click the paragraph, and a fourth starts over as a plain press.
+        clickCount = IsFollowUpClick(point) ? ((clickCount % 3) + 1) : 1;
+        lastClickTime  = point.Timestamp;
+        lastClickPoint = point.Position;
+
+        switch (clickCount)
+        {
+            case 2:
+                selection.SelectWord(pagePoint);
+                RedrawSelection();
+                return;
+
+            case 3:
+                selection.SelectParagraph(pagePoint);
+                RedrawSelection();
+                return;
+
+            default:
+                selection.Begin(pagePoint);
+                RedrawSelection();
+                dragging = CapturePointer(e.Pointer);
+                return;
+        }
     }
+
+    /// <summary>
+    /// True when a press lands soon enough after the last one, and near enough to it, to count as the next click
+    /// of a double or triple click. Both limits come from the user's own mouse settings.
+    /// </summary>
+    /// <param name="point">The press being counted.</param>
+    /// <returns>True for a follow-up click.</returns>
+    private bool IsFollowUpClick(PointerPoint point)
+    {
+        const int DoubleClickWidth  = 36;
+        const int DoubleClickHeight = 37;
+
+        // Pointer timestamps are in microseconds; the system double-click time is in milliseconds.
+        ulong  elapsed = (point.Timestamp - lastClickTime) / 1000;
+        double scale   = XamlRoot?.RasterizationScale ?? 1;
+        double dx      = Math.Abs(point.Position.X - lastClickPoint.X) * scale;
+        double dy      = Math.Abs(point.Position.Y - lastClickPoint.Y) * scale;
+
+        return (clickCount > 0)
+            && (elapsed <= GetDoubleClickTime())
+            && (dx <= GetSystemMetrics(DoubleClickWidth) / 2.0)
+            && (dy <= GetSystemMetrics(DoubleClickHeight) / 2.0);
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetDoubleClickTime();
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
 
     /// <inheritdoc/>
     protected override void OnPointerMoved(PointerRoutedEventArgs e)

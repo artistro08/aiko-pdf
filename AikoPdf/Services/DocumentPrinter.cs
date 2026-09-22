@@ -57,6 +57,11 @@ public sealed class DocumentPrinter
             throw new NotSupportedException("Printing is not available on this device.");
         }
 
+        if (!IsSpoolerRunning())
+        {
+            throw new PrintSpoolerStoppedException();
+        }
+
         var printer = new DocumentPrinter(session, PrintManagerInterop.GetForWindow(hwnd));
         printer.manager.PrintTaskRequested += printer.OnPrintTaskRequested;
         try
@@ -68,6 +73,26 @@ public sealed class DocumentPrinter
             printer.manager.PrintTaskRequested -= printer.OnPrintTaskRequested;
         }
     }
+
+    /// <summary>
+    /// True when the Windows print spooler is answering. With it stopped the print dialog still opens but lists
+    /// no printers, not even Microsoft Print to PDF, and its preview never finishes loading.
+    /// </summary>
+    /// <returns>False only when the spooler is known to be down.</returns>
+    public static bool IsSpoolerRunning()
+    {
+        // Asking for the local printer list with no buffer fails either way; why it fails is the answer. A
+        // running spooler says the buffer is too small, a stopped one says the RPC server is unavailable.
+        const uint EnumLocal         = 0x2;
+        const int  ServerUnavailable = 1722;
+
+        bool listed = EnumPrinters(EnumLocal, null, 1, nint.Zero, 0, out uint _, out uint _);
+        return listed || (System.Runtime.InteropServices.Marshal.GetLastWin32Error() != ServerUnavailable);
+    }
+
+    [System.Runtime.InteropServices.DllImport("winspool.drv", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool EnumPrinters(uint flags, string? name, uint level, nint buffer, uint size, out uint needed, out uint returned);
 
     /// <summary>Renders one page as a print page, sized in device-independent pixels at 96 per inch.</summary>
     /// <param name="pageNumber">1-based page number.</param>
@@ -145,5 +170,33 @@ public sealed class DocumentPrinter
                 App.Log($"Printing {session.Path} failed.");
             }
         };
+    }
+}
+
+/// <summary>The Windows print spooler is stopped, so no printer can be reached.</summary>
+/// <remarks>
+/// @author Devin Green (Artistro08)
+/// </remarks>
+public sealed class PrintSpoolerStoppedException : Exception
+{
+    /// <summary>Creates the exception with its standard message.</summary>
+    public PrintSpoolerStoppedException()
+        : base("The Print Spooler service is not running.")
+    {
+    }
+
+    /// <summary>Creates the exception with a message.</summary>
+    /// <param name="message">What went wrong.</param>
+    public PrintSpoolerStoppedException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>Creates the exception with a message and the failure behind it.</summary>
+    /// <param name="message">What went wrong.</param>
+    /// <param name="innerException">The underlying failure.</param>
+    public PrintSpoolerStoppedException(string message, Exception innerException)
+        : base(message, innerException)
+    {
     }
 }

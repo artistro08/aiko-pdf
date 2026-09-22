@@ -45,15 +45,15 @@ public sealed class ThumbnailItem : INotifyPropertyChanged
     /// <summary>1-based page number.</summary>
     public int PageNumber { get; }
 
-    /// <summary>What shows under the thumbnail: "Intro | Page 3" when the outline names the page, else "Page 3".</summary>
-    public string Label => FormatLabel(session.TextLayer?.GetPageName(PageNumber), PageNumber);
+    /// <summary>The first line under the thumbnail, always there: "Page 3".</summary>
+    public string PageLabel => $"Page {PageNumber}";
 
-    /// <summary>Builds the sidebar label for a page.</summary>
-    /// <param name="name">The page's outline name, or null.</param>
-    /// <param name="pageNumber">1-based page number.</param>
-    /// <returns>"Name | Page N" or "Page N".</returns>
-    public static string FormatLabel(string? name, int pageNumber)
-        => string.IsNullOrWhiteSpace(name) ? $"Page {pageNumber}" : $"{name} | Page {pageNumber}";
+    /// <summary>The second line under the thumbnail: the page's name from the document outline, or empty.</summary>
+    public string Title => session.TextLayer?.GetPageName(PageNumber)?.Trim() ?? string.Empty;
+
+    /// <summary>The second line only shows for a page the outline names.</summary>
+    public Microsoft.UI.Xaml.Visibility TitleVisibility
+        => string.IsNullOrEmpty(Title) ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
 
     /// <summary>Thumbnail width in device-independent pixels.</summary>
     public double Width => DisplayWidth;

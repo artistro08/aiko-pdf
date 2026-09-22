@@ -177,6 +177,64 @@ public sealed class TextSelection
         focus       = glyphs.Count - 1;
     }
 
+    /// <summary>
+    /// Selects the word under a point, the way a double-click does in any Windows text view. A point in the gap
+    /// between words takes the nearer one.
+    /// </summary>
+    /// <param name="point">The click position in rendered page coordinates.</param>
+    public void SelectWord(Point point)
+    {
+        int hit = HitTest(point);
+        if (hit < 0)
+        {
+            return;
+        }
+
+        int word  = glyphs[hit].WordIndex;
+        int first = hit;
+        int last  = hit;
+        while ((first > 0) && (glyphs[first - 1].WordIndex == word))
+        {
+            first--;
+        }
+
+        while ((last < glyphs.Count - 1) && (glyphs[last + 1].WordIndex == word))
+        {
+            last++;
+        }
+
+        anchorPoint = null;
+        anchor      = first;
+        focus       = last;
+    }
+
+    /// <summary>
+    /// Selects the paragraph under a point, the way a triple-click does: the run of lines that belong together,
+    /// which in a laid-out document is also the card or column the point is in.
+    /// </summary>
+    /// <param name="point">The click position in rendered page coordinates.</param>
+    public void SelectParagraph(Point point)
+    {
+        int hit = HitTest(point);
+        if (hit < 0)
+        {
+            return;
+        }
+
+        foreach (Block block in blocks)
+        {
+            int first = lines[block.FirstLine].First;
+            int last  = lines[block.LastLine].Last;
+            if ((hit >= first) && (hit <= last))
+            {
+                anchorPoint = null;
+                anchor      = first;
+                focus       = last;
+                return;
+            }
+        }
+    }
+
     /// <summary>Removes the selection.</summary>
     public void Clear()
     {

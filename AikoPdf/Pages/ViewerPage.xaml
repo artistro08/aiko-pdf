@@ -76,12 +76,22 @@
                                     BorderThickness="1">
                                     <Image Source="{x:Bind Image, Mode=OneWay}" Stretch="Fill" />
                                 </Border>
-                                <TextBlock
-                                    Text="{x:Bind Label}"
-                                    Style="{StaticResource CaptionTextBlockStyle}"
-                                    HorizontalAlignment="Left"
-                                    TextTrimming="CharacterEllipsis"
-                                    ToolTipService.ToolTip="{x:Bind Label}" />
+                                <!-- Page Label: the number, then the outline's name for the page on its own line -->
+                                <StackPanel Spacing="0">
+                                    <TextBlock
+                                        Text="{x:Bind PageLabel}"
+                                        Style="{StaticResource CaptionTextBlockStyle}"
+                                        HorizontalAlignment="Left" />
+                                    <TextBlock
+                                        Text="{x:Bind Title}"
+                                        Visibility="{x:Bind TitleVisibility}"
+                                        Style="{StaticResource CaptionTextBlockStyle}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        HorizontalAlignment="Left"
+                                        TextTrimming="CharacterEllipsis"
+                                        ToolTipService.ToolTip="{x:Bind Title}" />
+                                </StackPanel>
+                                <!-- /Page Label -->
                             </StackPanel>
                         </DataTemplate>
                     </ListView.ItemTemplate>
@@ -110,6 +120,26 @@
                     PointerWheelChanged="OnPageStackWheel"
                     PointerPressed="OnPageStackPressed" />
             </ScrollViewer>
+
+            <!-- Loading Cover: sits over the pages until the first ten have rendered, so the reader never scrolls
+                 into a page that is still blank; it fades away once they are in -->
+            <Grid
+                x:Name="LoadingCover"
+                Grid.Column="1"
+                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+                <StackPanel
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="12">
+                    <ProgressRing IsActive="True" Width="32" Height="32" />
+                    <TextBlock
+                        x:Name="LoadingText"
+                        Text="Loading pages"
+                        HorizontalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </Grid>
+            <!-- /Loading Cover -->
         </Grid>
         <!-- /Document -->
 

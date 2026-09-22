@@ -26,20 +26,52 @@
              the buttons out of the TitleBar control means it can't fade them on its own delayed schedule. -->
         <Grid Height="48">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
+            <!-- Pane Toggle: a square button of our own, the full height of the bar less a small inset. The
+                 TitleBar control's built-in toggle shrinks with its compact layout, which read as small and flat. -->
+            <Button
+                x:Name="PaneToggle"
+                Visibility="Collapsed"
+                Width="40"
+                Height="40"
+                Margin="4,0,0,0"
+                Padding="0"
+                VerticalAlignment="Center"
+                Background="Transparent"
+                BorderBrush="Transparent"
+                Click="OnPaneToggleClick"
+                ToolTipService.ToolTip="Show or hide pages">
+                <FontIcon Glyph="&#xE700;" FontSize="16" />
+            </Button>
+
             <TitleBar
                 x:Name="AppTitleBar"
-                IsPaneToggleButtonVisible="False"
-                PaneToggleRequested="OnPaneToggleRequested" />
+                Grid.Column="1"
+                IsPaneToggleButtonVisible="False" />
+
+            <!-- Window Title: the document name, left-aligned next to the pane toggle and cut short with an ellipsis
+                 when there is no room. Dims with the buttons when the window is inactive (see OnWindowMessage). -->
+            <TextBlock
+                x:Name="DocumentTitle"
+                Grid.Column="1"
+                Margin="12,0,12,0"
+                Style="{StaticResource CaptionTextBlockStyle}"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                IsHitTestVisible="False"
+                TextWrapping="NoWrap"
+                TextTrimming="CharacterEllipsis" />
+            <!-- /Window Title -->
 
             <!-- Title Buttons: open, then print and show in folder (document only), then open with -->
             <StackPanel
                 x:Name="TitleButtons"
-                Grid.Column="1"
+                Grid.Column="2"
                 Orientation="Horizontal"
                 Spacing="4"
                 VerticalAlignment="Center"
@@ -93,19 +125,7 @@
             <!-- /Title Buttons -->
 
             <!-- Caption Spacer: sized in code to the window's minimize, maximize and close buttons -->
-            <Border x:Name="CaptionSpacer" Grid.Column="2" Width="144" />
-
-            <!-- Window Title: the document name, centered on the whole window. Dims with the buttons when the
-                 window is inactive (see OnWindowMessage). -->
-            <TextBlock
-                x:Name="DocumentTitle"
-                Grid.ColumnSpan="3"
-                Style="{StaticResource CaptionTextBlockStyle}"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                IsHitTestVisible="False"
-                TextTrimming="CharacterEllipsis" />
-            <!-- /Window Title -->
+            <Border x:Name="CaptionSpacer" Grid.Column="3" Width="144" />
         </Grid>
         <!-- /Title Bar Row -->
 

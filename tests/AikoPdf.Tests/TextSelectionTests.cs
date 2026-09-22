@@ -252,12 +252,48 @@ public class TextSelectionTests
     }
 
     [Fact]
+    public void SelectWord_TakesTheWholeWordUnderThePoint()
+    {
+        var selection = new TextSelection(Glyphs);
+
+        selection.SelectWord(new Point(45, 5));
+        Assert.Equal("yo", selection.Text);
+
+        selection.SelectWord(new Point(2, 25));
+        Assert.Equal("ok", selection.Text);
+    }
+
+    [Fact]
+    public void SelectWord_InTheGapTakesTheNearerWord()
+    {
+        var selection = new TextSelection(Glyphs);
+        selection.SelectWord(new Point(22, 5));
+
+        Assert.Equal("Hi", selection.Text);
+    }
+
+    [Fact]
+    public void SelectParagraph_TakesTheCardUnderThePointAndNoOther()
+    {
+        var selection = new TextSelection(TwoCards, TwoCardPanels);
+
+        selection.SelectParagraph(new Point(12, 26));
+        Assert.Equal($"a{Environment.NewLine}TA{Environment.NewLine}r1x{Environment.NewLine}r2", selection.Text);
+
+        selection.SelectParagraph(new Point(112, 40));
+        Assert.StartsWith("b", selection.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("TA", selection.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void EmptyPage_IsSafeForEveryOperation()
     {
         var selection = new TextSelection([]);
         selection.Begin(new Point(5, 5));
         selection.Extend(new Point(50, 50));
         selection.SelectAll();
+        selection.SelectWord(new Point(5, 5));
+        selection.SelectParagraph(new Point(5, 5));
 
         Assert.True(selection.IsEmpty);
         Assert.Equal(-1, selection.HitTest(new Point(5, 5)));
