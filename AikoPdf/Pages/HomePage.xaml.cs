@@ -1,9 +1,9 @@
 using System.Globalization;
+using AikoPdf.Controls;
 using AikoPdf.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 
@@ -26,53 +26,34 @@ public sealed partial class HomePage : Page
             App.Recent.Prune();
             App.Recent.Changed += Refresh;
             Refresh();
-            FadeScrolledContent();
+            SizeRecentPanel(ActualWidth);
+
+            // Clear under the heading, fading in just below it, so a card scrolling up is gone before it gets there.
+            fade ??= ScrollFade.Attach(RecentSection, RecentSection, RecentFade, topLength: 24, bottomLength: 32, topHold: 50);
         };
-        RecentSection.SizeChanged += (_, _) => FadeScrolledContent();
         Unloaded += (_, _) => App.Recent.Changed -= Refresh;
     }
 
+    // Card width (the 120 preview plus the button's padding), the gap between cards, and the panel's inner margin.
+    private const double CardWidth    = 136;
+    private const double CardSpacing  = 16;
+    private const double PanelPadding = 48;
+
+    // Below this page width the panel holds three cards a row instead of four.
+    private const double FourAcrossWidth = 900;
+
+    private ScrollFade? fade;
+
     /// <summary>
-    /// Softens the top edge of the card list, so a card scrolling up disappears under the heading instead of being
-    /// cut off at it. The mask is a gradient over the scroller's own pixels, which the compositor applies; the
-    /// cards underneath stay where they are and still take clicks.
+    /// Sizes the recent panel to hold exactly four cards a row, or three in a narrow window, so it sits centered
+    /// with room around it instead of running to the window's edges.
     /// </summary>
-    private void FadeScrolledContent()
+    /// <param name="pageWidth">The page's current width.</param>
+    private void SizeRecentPanel(double pageWidth)
     {
-        // How far down the fade reaches, in device-independent pixels.
-        const float FadeHeight = 20;
-
-        var size = new System.Numerics.Vector2((float)RecentSection.ActualWidth, (float)RecentSection.ActualHeight);
-        if ((size.X <= 0) || (size.Y <= 0))
-        {
-            return;
-        }
-
-        Microsoft.UI.Composition.Visual visual = ElementCompositionPreview.GetElementVisual(RecentSection);
-        Microsoft.UI.Composition.Compositor compositor = visual.Compositor;
-
-        Microsoft.UI.Composition.CompositionLinearGradientBrush gradient = compositor.CreateLinearGradientBrush();
-        gradient.StartPoint = new System.Numerics.Vector2(0, 0);
-        gradient.EndPoint   = new System.Numerics.Vector2(0, FadeHeight / size.Y);
-        gradient.MappingMode = Microsoft.UI.Composition.CompositionMappingMode.Relative;
-        gradient.ColorStops.Add(compositor.CreateColorGradientStop(0, Windows.UI.Color.FromArgb(0, 255, 255, 255)));
-        gradient.ColorStops.Add(compositor.CreateColorGradientStop(1, Windows.UI.Color.FromArgb(255, 255, 255, 255)));
-
-        Microsoft.UI.Composition.CompositionVisualSurface surface = compositor.CreateVisualSurface();
-        surface.SourceVisual = visual;
-        surface.SourceSize   = size;
-
-        Microsoft.UI.Composition.CompositionMaskBrush mask = compositor.CreateMaskBrush();
-        mask.Source = compositor.CreateSurfaceBrush(surface);
-        mask.Mask   = gradient;
-
-        Microsoft.UI.Composition.SpriteVisual sprite = compositor.CreateSpriteVisual();
-        sprite.Size  = size;
-        sprite.Brush = mask;
-
-        // The real scroller keeps taking input while the masked copy is what the reader sees.
-        visual.Opacity = 0;
-        ElementCompositionPreview.SetElementChildVisual(RecentFade, sprite);
+        int columns = (pageWidth >= FourAcrossWidth) ? 4 : 3;
+        RecentLayout.MaximumRowsOrColumns = columns;
+        RecentIsland.Width = (columns * CardWidth) + ((columns - 1) * CardSpacing) + PanelPadding;
     }
 
     /// <summary>Formats a last-opened time for the card, in the user's short date and time format.</summary>
@@ -111,6 +92,8 @@ public sealed partial class HomePage : Page
         {
             WelcomeRow.MinHeight = e.NewSize.Height / 2;
         }
+
+        SizeRecentPanel(e.NewSize.Width);
 
         UpdateWindowMinimum();
     }

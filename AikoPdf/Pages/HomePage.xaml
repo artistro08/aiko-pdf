@@ -73,30 +73,21 @@
         </ScrollViewer>
         <!-- /Welcome -->
 
-        <!-- Recent: small cards on their own panel, left-aligned in the bottom half -->
+        <!-- Recent: small cards on their own panel, centered in the bottom half. The panel is sized in code to hold
+             exactly four cards a row, or three in a narrow window, so it never runs to the window's edges. -->
         <Border
             x:Name="RecentIsland"
             Grid.Row="1"
             Margin="12,0,12,12"
+            HorizontalAlignment="Center"
             CornerRadius="6"
             Background="{StaticResource IslandFillBrush}">
         <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <!-- The heading stays put while the cards scroll under it -->
-            <TextBlock
-                x:Name="RecentHeader"
-                Text="Recent"
-                Margin="20,16,20,12"
-                Style="{StaticResource SubtitleTextBlockStyle}" />
-
-            <ScrollViewer x:Name="RecentSection" Grid.Row="1">
+            <!-- The list fills the whole panel and starts below the heading, so cards scroll up behind it and
+                 fade out at the panel's own edge rather than stopping at a line under the heading. -->
+            <ScrollViewer x:Name="RecentSection">
             <StackPanel
-                MaxWidth="1040"
-                Margin="20,0,20,16"
+                Margin="24,60,24,16"
                 HorizontalAlignment="Stretch"
                 Spacing="8">
                 <InfoBar
@@ -104,14 +95,17 @@
                     Severity="Warning"
                     IsOpen="False" />
 
-                <!-- Cards: each one is a Button, which brings a rounded hover and press look for free. Pulled left
-                     by the button padding and border so the previews line up with the "Recent" heading. -->
-                <ItemsRepeater x:Name="RecentGrid" Margin="-9,0,0,0">
+                <!-- Cards: each one is a Button, which brings a rounded hover and press look for free. Centered in
+                     the panel; the column count is set in code. -->
+                <ItemsRepeater x:Name="RecentGrid" HorizontalAlignment="Center">
                     <ItemsRepeater.Layout>
                         <UniformGridLayout
+                            x:Name="RecentLayout"
                             MinItemWidth="136"
-                            MinRowSpacing="4"
-                            MinColumnSpacing="4"
+                            MinRowSpacing="8"
+                            MinColumnSpacing="16"
+                            MaximumRowsOrColumns="4"
+                            ItemsJustification="Center"
                             ItemsStretch="None" />
                     </ItemsRepeater.Layout>
                     <ItemsRepeater.ItemTemplate>
@@ -173,8 +167,28 @@
             </StackPanel>
             </ScrollViewer>
 
-            <!-- Holds the masked copy of the list that the reader actually sees -->
-            <Border x:Name="RecentFade" Grid.Row="1" IsHitTestVisible="False" />
+            <!-- Holds the faded copy of the list that the reader actually sees -->
+            <Border x:Name="RecentFade" IsHitTestVisible="False" />
+
+            <!-- Heading: its own small island of Mica, the window's material, rounded like the panel, staying put over
+                 the list as it scrolls away beneath -->
+            <Grid
+                x:Name="RecentHeader"
+                Margin="12,12,12,0"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                IsHitTestVisible="False">
+                <SystemBackdropElement CornerRadius="6">
+                    <SystemBackdropElement.SystemBackdrop>
+                        <MicaBackdrop />
+                    </SystemBackdropElement.SystemBackdrop>
+                </SystemBackdropElement>
+                <TextBlock
+                    Text="Recent"
+                    Margin="12,4,12,6"
+                    Style="{StaticResource SubtitleTextBlockStyle}" />
+            </Grid>
+            <!-- /Heading -->
         </Grid>
         </Border>
         <!-- /Recent -->

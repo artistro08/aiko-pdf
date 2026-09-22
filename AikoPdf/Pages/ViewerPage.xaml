@@ -49,6 +49,9 @@
                 RenderTransform="{x:Bind SidebarSlide}"
                 CornerRadius="6"
                 Background="{StaticResource IslandFillBrush}">
+                <Grid>
+                <!-- The list fills the island to its edges; its padding scrolls with it, so thumbnails run right up to
+                     the island's rounded edge and fade out there. -->
                 <ListView
                     x:Name="ThumbnailList"
                     Width="196"
@@ -124,6 +127,10 @@
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
+
+                <!-- Holds the faded copy of the list that the reader actually sees -->
+                <Border x:Name="ThumbnailFade" IsHitTestVisible="False" />
+                </Grid>
             </Border>
             <!-- /Sidebar Island -->
             </Grid>
@@ -139,10 +146,11 @@
                 IsTabStop="True"
                 ViewChanged="OnViewChanged"
                 SizeChanged="OnScrollerSizeChanged">
+                <!-- No padding above: the first page, and any page you jump to, sits flush with the top edge -->
                 <StackPanel
                     x:Name="PageStack"
                     Spacing="16"
-                    Padding="24"
+                    Padding="24,0,24,24"
                     HorizontalAlignment="Center"
                     Background="Transparent"
                     PointerWheelChanged="OnPageStackWheel"

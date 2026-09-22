@@ -61,6 +61,7 @@ public sealed partial class ViewerPage : Page
     public Microsoft.UI.Xaml.Media.TranslateTransform SidebarSlide { get; } = new();
     private PdfPageView? selectionPage;
     private int          renderedPages;
+    private ScrollFade?  thumbnailFade;
     private Microsoft.UI.Xaml.Media.Animation.Storyboard? coverFade;
     private bool         sidebarOpen = true;
     private Microsoft.UI.Xaml.Media.Animation.Storyboard? sidebarSlide;
@@ -132,6 +133,12 @@ public sealed partial class ViewerPage : Page
     {
         double displayScale = XamlRoot?.RasterizationScale ?? 1;
         ThumbnailList.ItemsSource = Enumerable.Range(1, session.PageCount).Select(n => new ThumbnailItem(session, n, displayScale)).ToList();
+
+        // Top and bottom of the page list fade out while there is more to scroll to that way.
+        if ((thumbnailFade is null) && (FindScrollViewer(ThumbnailList) is ScrollViewer thumbnails))
+        {
+            thumbnailFade = ScrollFade.Attach(ThumbnailList, thumbnails, ThumbnailFade, topLength: 28, bottomLength: 28);
+        }
 
         AddAccelerator(VirtualKey.C, VirtualKeyModifiers.Control, () => selectionPage?.CopySelection());
         AddAccelerator(VirtualKey.A, VirtualKeyModifiers.Control, () => pages[currentPage - 1].SelectAll());
@@ -385,9 +392,9 @@ public sealed partial class ViewerPage : Page
         Scroller.ChangeView(null, PageTop(Math.Clamp(pageNumber, 1, pages.Count)), null);
     }
 
-    /// <summary>The scroll offset that shows a page at the top with the same breathing room the first page gets.</summary>
+    /// <summary>The scroll offset that puts a page's top edge flush with the top of the view.</summary>
     private double PageTop(int pageNumber)
-        => Math.Max(0, pages[pageNumber - 1].ActualOffset.Y - PagePadding);
+        => Math.Max(0, pages[pageNumber - 1].ActualOffset.Y);
 
     /// <summary>Works out which page sits a third of the way down the viewport and reflects it in the status bar and sidebar.</summary>
     private void UpdateCurrentPage()

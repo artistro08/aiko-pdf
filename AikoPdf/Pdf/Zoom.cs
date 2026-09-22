@@ -44,7 +44,10 @@ public static class Zoom
     /// <param name="pageHeight">Tallest page height in points.</param>
     /// <param name="viewportWidth">Available width in device-independent pixels.</param>
     /// <param name="viewportHeight">Available height in device-independent pixels.</param>
-    /// <param name="padding">Space to leave around the page on each side, in device-independent pixels.</param>
+    /// <param name="padding">
+    /// Space to leave left, right and below the page, in device-independent pixels. None is left above: the
+    /// page sits flush with the top of the view.
+    /// </param>
     /// <param name="current">The scale in force, returned for custom mode or when the inputs are unusable.</param>
     /// <returns>The clamped fit scale.</returns>
     public static double Fit(ZoomMode mode, double pageWidth, double pageHeight, double viewportWidth, double viewportHeight, double padding, double current)
@@ -55,7 +58,7 @@ public static class Zoom
         }
 
         double availableWidth  = viewportWidth  - (2 * padding);
-        double availableHeight = viewportHeight - (2 * padding);
+        double availableHeight = viewportHeight - padding;
         if ((availableWidth <= 0) || (availableHeight <= 0))
         {
             return Clamp(current);

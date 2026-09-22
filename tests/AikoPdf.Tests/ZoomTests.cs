@@ -18,7 +18,8 @@ public class ZoomTests
     {
         double scale = Zoom.Fit(ZoomMode.FitPage, 612, 792, 1000, 400, 20, 1.0);
 
-        Assert.Equal(360.0 / 792.0, scale, 6);
+        // The page sits flush with the top, so only the space below it comes off the height.
+        Assert.Equal(380.0 / 792.0, scale, 6);
     }
 
     [Fact]
