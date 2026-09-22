@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="AikoPdf.Controls.PdfPageView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    IsTabStop="False">
+
+    <!-- Page: rendered bitmap, selection highlights on top, spinner until the first render lands -->
+    <!-- No border: a 1px frame would squeeze the bitmap by two pixels and resample it, blurring the text -->
+    <Grid
+        x:Name="Root"
+        Background="White">
+        <Grid.ContextFlyout>
+            <MenuFlyout>
+                <MenuFlyoutItem
+                    Text="Copy"
+                    Icon="Copy"
+                    KeyboardAcceleratorTextOverride="Ctrl+C"
+                    Click="OnCopyClick" />
+                <MenuFlyoutItem
+                    Text="Select all on this page"
+                    Icon="SelectAll"
+                    KeyboardAcceleratorTextOverride="Ctrl+A"
+                    Click="OnSelectAllClick" />
+            </MenuFlyout>
+        </Grid.ContextFlyout>
+
+        <Image x:Name="PageImage" Stretch="Fill" />
+
+        <Canvas x:Name="SelectionLayer" IsHitTestVisible="False" />
+
+        <!-- Anchor Marker: a 1px point the ScrollViewer keeps in place when the page changes size; see SetAnchor -->
+        <Border
+            x:Name="AnchorMarker"
+            Width="1"
+            Height="1"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            IsHitTestVisible="False"
+            Visibility="Collapsed" />
+
+        <ProgressRing
+            x:Name="LoadingRing"
+            IsActive="False"
+            Width="32"
+            Height="32" />
+    </Grid>
+    <!-- /Page -->
+</UserControl>

@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Unit tests for the parts of the app that don't need a window: page geometry, text selection, zoom, recent files,
+       the text layer and the renderer. Sources are linked in because the app builds as a WinUI executable and can't
+       be referenced from a test project. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows10.0.26100.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AikoPdf.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\AikoPdf\ExceptionFilters.cs" Link="ExceptionFilters.cs" />
+    <Compile Include="..\..\AikoPdf\Pdf\PageGeometry.cs" Link="Pdf\PageGeometry.cs" />
+    <Compile Include="..\..\AikoPdf\Pdf\PdfRenderer.cs" Link="Pdf\PdfRenderer.cs" />
+    <Compile Include="..\..\AikoPdf\Pdf\PdfTextLayer.cs" Link="Pdf\PdfTextLayer.cs" />
+    <Compile Include="..\..\AikoPdf\Pdf\TextGlyph.cs" Link="Pdf\TextGlyph.cs" />
+    <Compile Include="..\..\AikoPdf\Pdf\TextSelection.cs" Link="Pdf\TextSelection.cs" />
+    <Compile Include="..\..\AikoPdf\Pdf\Zoom.cs" Link="Pdf\Zoom.cs" />
+    <Compile Include="..\..\AikoPdf\Services\DefaultAppRegistration.cs" Link="Services\DefaultAppRegistration.cs" />
+    <Compile Include="..\..\AikoPdf\Services\RecentFiles.cs" Link="Services\RecentFiles.cs" />
+    <Compile Include="..\..\AikoPdf\Services\ThumbnailCache.cs" Link="Services\ThumbnailCache.cs" />
+    <Compile Include="..\..\AikoPdf\Services\AppSettings.cs" Link="Services\AppSettings.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+  </ItemGroup>
+
+</Project>

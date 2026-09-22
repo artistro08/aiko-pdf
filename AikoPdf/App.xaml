@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="AikoPdf.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+            <!-- Title Bar: no reserved drag strip between the right header and the caption buttons; the empty
+                 middle of the bar stays draggable -->
+            <x:Double x:Key="TitleBarMinDragRegionWidth">0</x:Double>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

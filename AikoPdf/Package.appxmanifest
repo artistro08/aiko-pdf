@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest for Aiko. The build stamps the version in from tools/build-release.ps1 and lays the package out
+  itself, which is what makes the app's XAML resolvable under package identity. Windows takes the PDF association
+  from here, so a packaged install needs none of the registry writes the portable build makes.
+-->
+<Package
+    xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+    xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+    xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+    xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+    IgnorableNamespaces="uap uap3 rescap">
+
+    <Identity
+        Name="Artistro08.Aiko"
+        Publisher="CN=Devin Green"
+        Version="1.0.0.0"
+        ProcessorArchitecture="x64" />
+
+    <Properties>
+        <DisplayName>Aiko</DisplayName>
+        <PublisherDisplayName>Devin Green</PublisherDisplayName>
+        <Logo>Assets\StoreLogo.png</Logo>
+    </Properties>
+
+    <Dependencies>
+        <TargetDeviceFamily Name="Windows.Desktop" MinVersion="1.0.0.0" MaxVersionTested="10.0.26100.0" />
+    </Dependencies>
+
+    <Resources>
+        <Resource Language="en-us" />
+    </Resources>
+
+    <Capabilities>
+        <rescap:Capability Name="runFullTrust" />
+    </Capabilities>
+
+    <Applications>
+        <Application Id="Aiko" Executable="AikoPdf.exe" EntryPoint="Windows.FullTrustApplication">
+            <uap:VisualElements
+                DisplayName="Aiko"
+                Description="A simple PDF reader."
+                BackgroundColor="transparent"
+                Square150x150Logo="Assets\Square150x150Logo.png"
+                Square44x44Logo="Assets\Square44x44Logo.png">
+                <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+            </uap:VisualElements>
+
+            <Extensions>
+                <!-- PDF Association: puts Aiko in "Open with" and in Default apps, and passes the file on launch -->
+                <uap3:Extension Category="windows.fileTypeAssociation">
+                    <uap3:FileTypeAssociation Name="pdf" Parameters="&quot;%1&quot;">
+                        <uap:DisplayName>PDF Document</uap:DisplayName>
+                        <uap:Logo>Assets\Square44x44Logo.png</uap:Logo>
+                        <uap:SupportedFileTypes>
+                            <uap:FileType>.pdf</uap:FileType>
+                        </uap:SupportedFileTypes>
+                    </uap3:FileTypeAssociation>
+                </uap3:Extension>
+            </Extensions>
+        </Application>
+    </Applications>
+</Package>
