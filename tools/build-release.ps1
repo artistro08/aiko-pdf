@@ -65,17 +65,25 @@ Compress-Archive -Path (Join-Path $payload '*') -DestinationPath $zip -Compressi
 # The package: same code, built again with the MSIX tooling so the layout and the resource index carry the
 # package identity from Package.appxmanifest.
 Write-Host 'Building MSIX...' -ForegroundColor Cyan
+# The manifest is a checked-in file, so the version goes in for the build and comes straight back out: a release
+# build must not leave the working tree dirty. It is written without a byte order mark whichever PowerShell runs
+# this, so the file does not change shape build to build.
 $manifestText = Get-Content $manifest -Raw
 $stamped      = [regex]::Replace($manifestText, '(?<=Version=")\d+\.\d+\.\d+\.\d+(?=")', "$Version.0")
-
-# Written without a byte order mark whichever PowerShell runs this, so the manifest does not change shape build
-# to build.
-[IO.File]::WriteAllText($manifest, $stamped, [Text.UTF8Encoding]::new($false))
+$utf8         = [Text.UTF8Encoding]::new($false)
 
 if (Test-Path $packages) { Remove-Item -Recurse -Force $packages }
-dotnet build $project -c $Configuration -p:Platform=x64 -p:WindowsPackageType=MSIX `
-    -p:GenerateAppxPackageOnBuild=true -p:Version="$Version.0" --nologo
-if ($LASTEXITCODE -ne 0) { throw 'MSIX build failed' }
+[IO.File]::WriteAllText($manifest, $stamped, $utf8)
+try
+{
+    dotnet build $project -c $Configuration -p:Platform=x64 -p:WindowsPackageType=MSIX `
+        -p:GenerateAppxPackageOnBuild=true -p:Version="$Version.0" --nologo
+    if ($LASTEXITCODE -ne 0) { throw 'MSIX build failed' }
+}
+finally
+{
+    [IO.File]::WriteAllText($manifest, $manifestText, $utf8)
+}
 
 $built = Get-ChildItem $packages -Recurse -Filter '*.msix' | Select-Object -First 1
 if (-not $built) { throw 'no MSIX was produced' }

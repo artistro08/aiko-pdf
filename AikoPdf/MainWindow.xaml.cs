@@ -412,6 +412,11 @@ public sealed partial class MainWindow : Window
     {
         double scale = Content.XamlRoot?.RasterizationScale ?? 1;
         CaptionSpacer.Width = AppWindow.TitleBar.RightInset / scale;
+
+        // The title is centered across the whole window, so it has to stay clear of the buttons on both sides or
+        // a long file name runs underneath them.
+        double clear = TitleButtons.ActualWidth + CaptionSpacer.Width + 16;
+        DocumentTitle.MaxWidth = Math.Max(120, (AppWindow.Size.Width / scale) - (2 * clear));
     }
 
     // =========================================================================

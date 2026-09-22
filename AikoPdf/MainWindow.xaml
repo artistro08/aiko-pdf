@@ -101,7 +101,6 @@
                 x:Name="DocumentTitle"
                 Grid.ColumnSpan="3"
                 Style="{StaticResource CaptionTextBlockStyle}"
-                MaxWidth="480"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 IsHitTestVisible="False"
