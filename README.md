@@ -21,7 +21,7 @@ I built this because I wanted a simple PDF viewer that looked good. There is a
 
 Download `Aiko-<version>-x64.msix` and `Aiko.cer` from [Releases](https://github.com/artistro08/aiko-pdf/releases).
 
-Aiko is signed with my own certificate, so Windows needs to be told once that it trusts it:
+The package isn't signed, so installing it by itself won't work. you have to install the cert first (only if you trust it of course).
 
 1. Double-click **Aiko.cer** and choose **Install Certificate**.
 2. Pick **Local Machine**, then **Yes** at the prompt for administrator rights.
