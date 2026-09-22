@@ -67,5 +67,12 @@ else {
 $installed = Get-AppxPackage -Name 'Artistro08.Aiko'
 if (-not $installed) { throw 'The package did not install' }
 
+# A folder copy run earlier registers itself for PDFs under HKCU. The package carries its own association, so
+# clear that entry or Windows offers two Aikos, one of them pointing at a folder that may be gone.
+Remove-Item 'HKCU:\Software\Classes\Aiko.PDF' -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item 'HKCU:\Software\Aiko' -Recurse -Force -ErrorAction SilentlyContinue
+Remove-ItemProperty 'HKCU:\Software\Classes\.pdf\OpenWithProgids' -Name 'Aiko.PDF' -ErrorAction SilentlyContinue
+Remove-ItemProperty 'HKCU:\Software\RegisteredApplications' -Name 'Aiko' -ErrorAction SilentlyContinue
+
 Write-Host "Installed $($installed.Name) $($installed.Version)" -ForegroundColor Green
 Write-Host 'Aiko is in the Start menu, and offered for PDFs under Open with.'

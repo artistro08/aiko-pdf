@@ -72,25 +72,6 @@ public static class DefaultAppRegistration
         registered.SetValue(AppName, $@"Software\{AppName}\Capabilities");
     }
 
-    /// <summary>
-    /// Removes the registration. The packaged build calls this so a folder copy the user ran earlier stops showing
-    /// a second, dead Aiko under "Open with"; the package carries its own association.
-    /// </summary>
-    /// <param name="root">Normally <c>Registry.CurrentUser</c>; tests pass a throwaway key.</param>
-    public static void Unregister(RegistryKey root)
-    {
-        root.DeleteSubKeyTree($@"Software\Classes\{ProgId}", throwOnMissingSubKey: false);
-        root.DeleteSubKeyTree($@"Software\{AppName}", throwOnMissingSubKey: false);
-
-        using (RegistryKey? openWith = root.OpenSubKey(@"Software\Classes\.pdf\OpenWithProgids", writable: true))
-        {
-            openWith?.DeleteValue(ProgId, throwOnMissingValue: false);
-        }
-
-        using RegistryKey? registered = root.OpenSubKey(@"Software\RegisteredApplications", writable: true);
-        registered?.DeleteValue(AppName, throwOnMissingValue: false);
-    }
-
     /// <summary>True when the registration points at the given executable.</summary>
     /// <param name="root">The hive root that was registered under.</param>
     /// <param name="executablePath">Full path of the app executable.</param>

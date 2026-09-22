@@ -45,27 +45,6 @@ public sealed class DefaultAppRegistrationTests : IDisposable
     }
 
     [Fact]
-    public void Unregister_TakesTheAppBackOutOfWindows()
-    {
-        DefaultAppRegistration.Register(root, @"C:\Apps\Aiko\AikoPdf.exe");
-        DefaultAppRegistration.Unregister(root);
-
-        Assert.Null(root.OpenSubKey($@"Software\Classes\{DefaultAppRegistration.ProgId}"));
-        Assert.Null(root.OpenSubKey($@"Software\{DefaultAppRegistration.AppName}"));
-        Assert.Null(root.OpenSubKey(@"Software\Classes\.pdf\OpenWithProgids")!.GetValue(DefaultAppRegistration.ProgId));
-        Assert.Null(root.OpenSubKey(@"Software\RegisteredApplications")!.GetValue(DefaultAppRegistration.AppName));
-        Assert.False(DefaultAppRegistration.IsRegistered(root, @"C:\Apps\Aiko\AikoPdf.exe"));
-    }
-
-    [Fact]
-    public void Unregister_OnAFreshUserDoesNothing()
-    {
-        DefaultAppRegistration.Unregister(root);
-
-        Assert.Null(root.OpenSubKey($@"Software\Classes\{DefaultAppRegistration.ProgId}"));
-    }
-
-    [Fact]
     public void SettingsUriFor_PointsAtThePackagedApp()
     {
         Assert.Equal(

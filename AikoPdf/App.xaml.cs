@@ -102,15 +102,12 @@ public partial class App : Application
         // Keep Windows pointed at this executable so "Open with" and Default apps list it, wherever it lives.
         // Written only when it has moved, so a normal launch leaves the registry alone. The packaged build gets
         // the same association from its manifest instead.
-        try
+        // The packaged build takes its association from the manifest, and its registry writes go into the package
+        // anyway, so only the portable build registers itself here. tools\install.ps1 clears a portable entry left
+        // behind when the package is installed.
+        if (!IsPackaged)
         {
-            if (IsPackaged)
-            {
-                // The package carries the association. Clearing the portable build's entry keeps Windows from
-                // offering a second Aiko that points at a folder the user may have deleted.
-                DefaultAppRegistration.Unregister(Microsoft.Win32.Registry.CurrentUser);
-            }
-            else
+            try
             {
                 string executable = Environment.ProcessPath ?? string.Empty;
                 if (!DefaultAppRegistration.IsRegistered(Microsoft.Win32.Registry.CurrentUser, executable))
@@ -118,10 +115,10 @@ public partial class App : Application
                     DefaultAppRegistration.Register(Microsoft.Win32.Registry.CurrentUser, executable);
                 }
             }
-        }
-        catch (Exception ex) when (ExceptionFilters.IsRecoverable(ex))
-        {
-            Log($"Default app registration failed: {ex.Message}");
+            catch (Exception ex) when (ExceptionFilters.IsRecoverable(ex))
+            {
+                Log($"Default app registration failed: {ex.Message}");
+            }
         }
 
         if (StartupFile() is { } startupFile)
