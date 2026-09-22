@@ -1,16 +1,16 @@
 <p align="center">
-    <img src="docs/aiko.png" width="128" alt="Aiko" />
+    <img src="docs/aiko.png" width="128" alt="Aiko PDF" />
 </p>
 
 <h1 align="center">
-    Aiko
+    Aiko PDF
 </h1>
 
 <p align="center">
     A native WinUI 3 PDF reader for Windows.
 </p>
 
-![Aiko with a document open](docs/screenshot.png)
+![Aiko PDF with a document open](docs/screenshot.png)
 
 
 I built this because I wanted a simple PDF viewer that looked good. There is a
@@ -28,7 +28,7 @@ The package isn't signed, so installing it by itself won't work. you have to ins
 4. **Next**, then **Finish**. Windows says the import succeeded.
 5. Double-click **Aiko-<version>-x64.msix** and choose **Install**.
 
-That is it. Aiko is in the Start menu and offered for PDFs under **Open with**.
+That is it. Aiko PDF is in the Start menu and offered for PDFs under **Open with**.
 
 ## Building
 
@@ -49,11 +49,17 @@ pwsh -File tools/build-release.ps1
 
 | Keys | What it does |
 | --- | --- |
-| Ctrl+O / Ctrl+P | Open, print |
-| Ctrl+C / Ctrl+A | Copy the selection, select the page |
-| Ctrl+wheel, Ctrl+Plus / Minus | Zoom |
-| Ctrl+0 / Ctrl+1 / Ctrl+2 | Fit page, 100%, fit width |
+| Ctrl+O | Open |
+| Ctrl+P | Print |
+| Ctrl+C | Copy the selection |
+| Ctrl+A | Select the page |
+| Ctrl+wheel | Zoom |
+| Ctrl+Plus | Zoom in |
+| Ctrl+Minus | Zoom out |
+| Ctrl+0 | Fit page |
+| Ctrl+1 | 100% |
+| Ctrl+2 | Fit width |
 
 ## License
 
-MIT, see [LICENSE](LICENSE). The parts Aiko is built on are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+MIT, see [LICENSE](LICENSE). The parts Aiko PDF is built on are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Aiko ships with these components. Each stays under its own license.
+Aiko PDF ships with these components. Each stays under its own license.
 
 | Component | Used for | License |
 | --- | --- | --- |
