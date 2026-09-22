@@ -80,7 +80,12 @@ public sealed class AppSettings
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllText(path, JsonSerializer.Serialize(this, JsonOptions));
+
+            // Write beside, then swap: every open window saves its size here, and a crash mid-write must not
+            // leave a half-written file that resets everything to the defaults.
+            string temp = path + ".tmp";
+            File.WriteAllText(temp, JsonSerializer.Serialize(this, JsonOptions));
+            File.Move(temp, path, overwrite: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

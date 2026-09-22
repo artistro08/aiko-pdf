@@ -22,7 +22,10 @@
     <Compile Include="..\..\AikoPdf\Pdf\TextGlyph.cs" Link="Pdf\TextGlyph.cs" />
     <Compile Include="..\..\AikoPdf\Pdf\TextSelection.cs" Link="Pdf\TextSelection.cs" />
     <Compile Include="..\..\AikoPdf\Pdf\Zoom.cs" Link="Pdf\Zoom.cs" />
+    <Compile Include="..\..\AikoPdf\Pdf\ZoomMode.cs" Link="Pdf\ZoomMode.cs" />
     <Compile Include="..\..\AikoPdf\Services\DefaultAppRegistration.cs" Link="Services\DefaultAppRegistration.cs" />
+    <Compile Include="..\..\AikoPdf\Services\LaunchArguments.cs" Link="Services\LaunchArguments.cs" />
+    <Compile Include="..\..\AikoPdf\Services\RecentFile.cs" Link="Services\RecentFile.cs" />
     <Compile Include="..\..\AikoPdf\Services\RecentFiles.cs" Link="Services\RecentFiles.cs" />
     <Compile Include="..\..\AikoPdf\Services\ThumbnailCache.cs" Link="Services\ThumbnailCache.cs" />
     <Compile Include="..\..\AikoPdf\Services\AppSettings.cs" Link="Services\AppSettings.cs" />

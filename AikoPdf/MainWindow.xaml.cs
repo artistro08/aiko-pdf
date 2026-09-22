@@ -32,7 +32,7 @@ public sealed partial class MainWindow : Window
 
     private PdfSession?   current;
     private ViewerPage?   viewer;
-    private SubclassProc? activationHook;
+    private NativeMethods.SubclassProc? activationHook;
     private bool          opening;
     private bool          sized;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? sizeSave;
@@ -60,6 +60,7 @@ public sealed partial class MainWindow : Window
         {
             SaveWindowSize();
             current?.Dispose();
+            App.EndSession();
         };
         AppWindow.Changed += (_, args) =>
         {
@@ -351,6 +352,32 @@ public sealed partial class MainWindow : Window
 
         current?.Dispose();
         current = null;
+        App.SetWindowKey(App.HomeKey);
+    }
+
+    /// <summary>True when a PDF handed over from another launch belongs here: on the home page, or already showing it.</summary>
+    /// <param name="path">The PDF being handed over.</param>
+    /// <returns>False while a file is opening or a different document is showing.</returns>
+    public bool CanTake(string path)
+        => !opening && ((RootFrame.Content is HomePage)
+            || ((current is not null) && App.DocumentKey(current.Path).Equals(App.DocumentKey(path), StringComparison.Ordinal)));
+
+    /// <summary>What this window can take from other launches right now: see <see cref="App.SetWindowKey"/>.</summary>
+    private string? WindowKey()
+        => (RootFrame.Content is HomePage) ? App.HomeKey
+            : (current is not null) ? App.DocumentKey(current.Path)
+            : null;
+
+    /// <summary>Restores the window if it is minimized and brings it in front of the others.</summary>
+    public void BringToFront()
+    {
+        if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized } presenter)
+        {
+            presenter.Restore();
+        }
+
+        Activate();
+        NativeMethods.SetForegroundWindow(WinRT.Interop.WindowNative.GetWindowHandle(this));
     }
 
     /// <summary>
@@ -399,7 +426,8 @@ public sealed partial class MainWindow : Window
 
     /// <summary>
     /// Opens a PDF and shows it in the viewer. Asks for a password when the file needs one, and explains any
-    /// failure in a dialog instead of throwing. A second open while one is in progress is ignored.
+    /// failure in a dialog instead of throwing. A second open while one is in progress is ignored, and a PDF that
+    /// is already showing, here or in another window, just brings that window forward.
     /// </summary>
     /// <param name="path">Full path of the file.</param>
     public async Task OpenFileAsync(string path)
@@ -409,7 +437,21 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        if ((current is not null) && App.DocumentKey(current.Path).Equals(App.DocumentKey(path), StringComparison.Ordinal))
+        {
+            BringToFront();
+            return;
+        }
+
+        if (App.ShowWindowWithDocument(path))
+        {
+            return;
+        }
+
+        // Not offered to other launches while this one is busy opening; the finally below offers it again, as a
+        // home page or as the document it now shows.
         opening = true;
+        App.SetWindowKey(null);
         try
         {
             PdfSession? session = await OpenWithPasswordPromptAsync(path);
@@ -442,6 +484,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             opening = false;
+            App.SetWindowKey(WindowKey());
         }
     }
 
@@ -568,20 +611,16 @@ public sealed partial class MainWindow : Window
     {
         get
         {
-            uint dpi = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this));
+            uint dpi = NativeMethods.GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this));
             return (dpi > 0) ? (dpi / 96.0) : (Content?.XamlRoot?.RasterizationScale ?? 1);
         }
     }
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern uint GetDpiForWindow(nint hWnd);
 
     /// <summary>Keeps the button row clear of the caption buttons, whose width the frame reports in physical pixels.</summary>
     private void SizeCaptionSpacer()
     {
         double scale = DisplayScale;
         CaptionSpacer.Width = AppWindow.TitleBar.RightInset / scale;
-
     }
 
     // =========================================================================
@@ -599,7 +638,7 @@ public sealed partial class MainWindow : Window
     private void HookActivation()
     {
         activationHook = OnWindowMessage;
-        SetWindowSubclass(WinRT.Interop.WindowNative.GetWindowHandle(this), activationHook, 1, nint.Zero);
+        NativeMethods.SetWindowSubclass(WinRT.Interop.WindowNative.GetWindowHandle(this), activationHook, 1, nint.Zero);
     }
 
     private nint OnWindowMessage(nint hWnd, uint msg, nint wParam, nint lParam, nint id, nint data)
@@ -613,17 +652,8 @@ public sealed partial class MainWindow : Window
             PaneToggle.Opacity    = opacity;
         }
 
-        return DefSubclassProc(hWnd, msg, wParam, lParam);
+        return NativeMethods.DefSubclassProc(hWnd, msg, wParam, lParam);
     }
-
-    private delegate nint SubclassProc(nint hWnd, uint msg, nint wParam, nint lParam, nint id, nint data);
-
-    [System.Runtime.InteropServices.DllImport("comctl32.dll")]
-    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-    private static extern bool SetWindowSubclass(nint hWnd, SubclassProc proc, nint id, nint data);
-
-    [System.Runtime.InteropServices.DllImport("comctl32.dll")]
-    private static extern nint DefSubclassProc(nint hWnd, uint msg, nint wParam, nint lParam);
 
     // =========================================================================
     // INPUT: TITLE BAR, SHORTCUT AND DRAG-DROP
@@ -709,43 +739,24 @@ public sealed partial class MainWindow : Window
         const uint mouseMove  = 0x0200;
         const uint mouseLeave = 0x02A3;
 
-        nint captionControls = FindWindowEx(WinRT.Interop.WindowNative.GetWindowHandle(this), nint.Zero, "ReunionWindowingCaptionControls", null);
+        nint captionControls = NativeMethods.FindWindowEx(WinRT.Interop.WindowNative.GetWindowHandle(this), nint.Zero, "ReunionWindowingCaptionControls", null);
         if (captionControls != nint.Zero)
         {
             // A move to (-1,-1) lands on no button, the leave clears the highlight, and cancelling hover tracking
             // stops the tooltip that would otherwise still pop up for the button the pointer just left.
-            SendMessage(captionControls, mouseMove, nint.Zero, -1);
-            SendMessage(captionControls, mouseLeave, nint.Zero, nint.Zero);
+            NativeMethods.SendMessage(captionControls, mouseMove, nint.Zero, -1);
+            NativeMethods.SendMessage(captionControls, mouseLeave, nint.Zero, nint.Zero);
 
-            var cancelHover = new TrackMouseEventData
+            var cancelHover = new NativeMethods.TrackMouseEventData
             {
-                Size      = (uint)System.Runtime.InteropServices.Marshal.SizeOf<TrackMouseEventData>(),
+                Size      = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.TrackMouseEventData>(),
                 Flags     = 0x80000001,
                 Window    = captionControls,
                 HoverTime = 0,
             };
-            TrackMouseEvent(ref cancelHover);
+            NativeMethods.TrackMouseEvent(ref cancelHover);
         }
     }
-
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    private struct TrackMouseEventData
-    {
-        public uint Size;
-        public uint Flags;
-        public nint Window;
-        public uint HoverTime;
-    }
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-    private static extern bool TrackMouseEvent(ref TrackMouseEventData data);
-
-    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
-    private static extern nint FindWindowEx(nint parent, nint after, string className, string? windowName);
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern nint SendMessage(nint hWnd, uint msg, nint wParam, nint lParam);
 
     private void OnOpenAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {

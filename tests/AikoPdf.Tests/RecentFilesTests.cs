@@ -99,7 +99,7 @@ public sealed class RecentFilesTests : IDisposable
     {
         var recent = new RecentFiles(StorePath);
         var fired  = 0;
-        recent.Changed += () => fired++;
+        recent.Changed += (_, _) => fired++;
 
         recent.Add(@"C:\docs\a.pdf");
         recent.Remove(@"C:\docs\a.pdf");

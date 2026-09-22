@@ -221,8 +221,11 @@ internal static class Pdfium
     /// <returns>The title, or an empty string.</returns>
     public static string BookmarkTitle(nint bookmark)
     {
+        // A title longer than this is damage, not a name; it is skipped rather than allocated.
+        const uint MaxTitleBytes = 64 * 1024;
+
         uint bytes = FPDFBookmark_GetTitle(bookmark, nint.Zero, 0);
-        if (bytes <= 2)
+        if ((bytes <= 2) || (bytes > MaxTitleBytes))
         {
             return string.Empty;
         }

@@ -3,20 +3,6 @@ using System.Text.Json.Serialization;
 
 namespace AikoPdf.Services;
 
-/// <summary>A PDF the user opened before.</summary>
-/// <param name="Path">Full path of the file.</param>
-/// <param name="LastOpened">When it was last opened.</param>
-public sealed record RecentFile(string Path, DateTimeOffset LastOpened)
-{
-    /// <summary>The file name without its folder, for display.</summary>
-    [JsonIgnore]
-    public string Name => System.IO.Path.GetFileName(Path);
-
-    /// <summary>The folder the file lives in, for display under the name.</summary>
-    [JsonIgnore]
-    public string Folder => System.IO.Path.GetDirectoryName(Path) ?? string.Empty;
-}
-
 /// <summary>
 /// The list of recently opened PDFs shown on the home page, most recent first, persisted as JSON under
 /// %LOCALAPPDATA%\AikoPdf. The store path is injectable so tests never touch the real list.
@@ -45,7 +31,7 @@ public sealed class RecentFiles
     public IReadOnlyList<RecentFile> Items => items;
 
     /// <summary>Raised after the list changes, so the home page can refresh.</summary>
-    public event Action? Changed;
+    public event EventHandler? Changed;
 
     /// <summary>The default store location for this Windows user.</summary>
     public static string DefaultStorePath
@@ -184,6 +170,6 @@ public sealed class RecentFiles
             // Losing the recent list is a nuisance, not a reason to fail the open.
         }
 
-        Changed?.Invoke();
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 }

@@ -7,21 +7,30 @@
     KeyboardAcceleratorPlacementMode="Hidden">
 
     <Page.Resources>
-        <!-- Island Fill: a touch darker than the window in either theme -->
-        <SolidColorBrush x:Key="IslandFillBrush" Color="#000000" Opacity="0.18" />
-        <!-- Tool Button: compact, same height as the zoom dropdown so the status bar reads as one row -->
-        <Style x:Key="ToolButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Width" Value="26" />
-            <Setter Property="Height" Value="26" />
-            <Setter Property="MinWidth" Value="26" />
-        </Style>
-        <!-- Tool Icon: the glyph size inside status bar buttons -->
-        <x:Double x:Key="ToolIconSize">13</x:Double>
-        <!-- Zoom Tooltip: the slider thumb reads as a percentage while dragging -->
-        <controls:ZoomPercentConverter x:Key="ZoomPercentConverter" />
+        <ResourceDictionary>
+            <!-- The thumbnail island's fill: a shade over the window's Mica, lighter in light mode -->
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="IslandFillBrush" Color="#000000" Opacity="0.18" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="IslandFillBrush" Color="#000000" Opacity="0.07" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+            <!-- Tool Button: compact, same height as the zoom dropdown so the status bar reads as one row -->
+            <Style x:Key="ToolButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Width" Value="26" />
+                <Setter Property="Height" Value="26" />
+                <Setter Property="MinWidth" Value="26" />
+            </Style>
+            <!-- Tool Icon: the glyph size inside status bar buttons -->
+            <x:Double x:Key="ToolIconSize">13</x:Double>
+            <!-- Zoom Tooltip: the slider thumb reads as a percentage while dragging -->
+            <controls:ZoomPercentConverter x:Key="ZoomPercentConverter" />
+        </ResourceDictionary>
     </Page.Resources>
 
     <Grid>
@@ -45,10 +54,10 @@
                 x:Name="SidebarIsland"
                 Width="196"
                 HorizontalAlignment="Left"
-                Margin="12,0,12,8"
+                Margin="12,0,12,14"
                 RenderTransform="{x:Bind SidebarSlide}"
                 CornerRadius="6"
-                Background="{StaticResource IslandFillBrush}">
+                Background="{ThemeResource IslandFillBrush}">
                 <Grid>
                 <!-- The list fills the island to its edges; its padding scrolls with it, so thumbnails run right up to
                      the island's rounded edge and fade out there. -->
@@ -139,7 +148,6 @@
             <ScrollViewer
                 x:Name="Scroller"
                 Grid.Column="1"
-                VerticalAnchorRatio="0.33"
                 HorizontalScrollBarVisibility="Auto"
                 HorizontalScrollMode="Auto"
                 ZoomMode="Disabled"
@@ -156,6 +164,9 @@
                     PointerWheelChanged="OnPageStackWheel"
                     PointerPressed="OnPageStackPressed" />
             </ScrollViewer>
+
+            <!-- Holds the faded copy of the pages that the reader actually sees -->
+            <Border x:Name="PageFade" Grid.Column="1" IsHitTestVisible="False" />
 
             <!-- Loading Cover: sits over the pages until the first ten have rendered, so the reader never scrolls
                  into a page that is still blank; it fades away once they are in -->
@@ -194,6 +205,7 @@
             <StackPanel Orientation="Horizontal" Spacing="4">
                 <Button
                     Style="{StaticResource ToolButtonStyle}"
+                    AutomationProperties.Name="Go to page"
                     ToolTipService.ToolTip="Go to page">
                     <!-- Nudged up: the page glyph sits visually low at this size -->
                     <FontIcon Glyph="&#xE7C3;" FontSize="{StaticResource ToolIconSize}" Margin="0,0,0,1" />
@@ -218,12 +230,14 @@
                     <Button
                         Style="{StaticResource ToolButtonStyle}"
                         Click="OnPreviousClick"
+                        AutomationProperties.Name="Previous page"
                         ToolTipService.ToolTip="Previous page">
                         <FontIcon Glyph="&#xE76B;" FontSize="{StaticResource ToolIconSize}" />
                     </Button>
                     <Button
                         Style="{StaticResource ToolButtonStyle}"
                         Click="OnNextClick"
+                        AutomationProperties.Name="Next page"
                         ToolTipService.ToolTip="Next page">
                         <FontIcon Glyph="&#xE76C;" FontSize="{StaticResource ToolIconSize}" />
                     </Button>
@@ -246,10 +260,12 @@
                     VerticalContentAlignment="Center"
                     FontSize="12"
                     SelectionChanged="OnZoomComboChanged"
+                    AutomationProperties.Name="Zoom"
                     ToolTipService.ToolTip="Zoom" />
                 <Button
                     Style="{StaticResource ToolButtonStyle}"
                     Click="OnZoomOutClick"
+                    AutomationProperties.Name="Zoom out"
                     ToolTipService.ToolTip="Zoom out (Ctrl+Minus)">
                     <FontIcon Glyph="&#xE71F;" FontSize="{StaticResource ToolIconSize}" />
                 </Button>
@@ -265,10 +281,12 @@
                     ThumbToolTipValueConverter="{StaticResource ZoomPercentConverter}"
                     VerticalAlignment="Center"
                     ValueChanged="OnZoomSliderChanged"
+                    AutomationProperties.Name="Zoom"
                     ToolTipService.ToolTip="Zoom" />
                 <Button
                     Style="{StaticResource ToolButtonStyle}"
                     Click="OnZoomInClick"
+                    AutomationProperties.Name="Zoom in"
                     ToolTipService.ToolTip="Zoom in (Ctrl+Plus)">
                     <FontIcon Glyph="&#xE8A3;" FontSize="{StaticResource ToolIconSize}" />
                 </Button>
@@ -282,12 +300,14 @@
                 <Button
                     Style="{StaticResource ToolButtonStyle}"
                     Click="OnHomeClick"
+                    AutomationProperties.Name="Home"
                     ToolTipService.ToolTip="Home">
                     <FontIcon Glyph="&#xE80F;" FontSize="{StaticResource ToolIconSize}" />
                 </Button>
                 <Button
                     Style="{StaticResource ToolButtonStyle}"
                     Click="OnSettingsClick"
+                    AutomationProperties.Name="Settings"
                     ToolTipService.ToolTip="Settings">
                     <FontIcon Glyph="&#xE713;" FontSize="{StaticResource ToolIconSize}" />
                 </Button>

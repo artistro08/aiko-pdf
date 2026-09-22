@@ -45,6 +45,7 @@
                 Background="Transparent"
                 BorderBrush="Transparent"
                 Click="OnPaneToggleClick"
+                AutomationProperties.Name="Show or hide pages"
                 ToolTipService.ToolTip="Show or hide pages">
                 <FontIcon Glyph="&#xE700;" FontSize="16" />
             </Button>
@@ -85,6 +86,7 @@
                     Padding="8,0"
                     Height="32"
                     Click="OnOpenClick"
+                    AutomationProperties.Name="Open a PDF"
                     ToolTipService.ToolTip="Open a PDF (Ctrl+O)">
                     <FontIcon Glyph="&#xE838;" FontSize="16" />
                 </Button>
@@ -96,6 +98,7 @@
                     Padding="8,0"
                     Height="32"
                     Click="OnPrintClick"
+                    AutomationProperties.Name="Print"
                     ToolTipService.ToolTip="Print (Ctrl+P)">
                     <FontIcon Glyph="&#xE749;" FontSize="16" />
                 </Button>
@@ -107,6 +110,7 @@
                     Padding="8,0"
                     Height="32"
                     Click="OnShowInFolderClick"
+                    AutomationProperties.Name="Show in folder"
                     ToolTipService.ToolTip="Show in folder">
                     <FontIcon Glyph="&#xEC50;" FontSize="16" />
                 </Button>
@@ -118,6 +122,7 @@
                     Padding="8,0"
                     Height="32"
                     Click="OnOpenWithClick"
+                    AutomationProperties.Name="Open with another app"
                     ToolTipService.ToolTip="Open this PDF with another app">
                     <FontIcon Glyph="&#xE8A7;" FontSize="16" />
                 </Button>

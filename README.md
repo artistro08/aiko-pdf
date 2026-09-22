@@ -52,3 +52,7 @@ pwsh -File tools/build-release.ps1
 | Ctrl+C / Ctrl+A | Copy the selection, select the page |
 | Ctrl+wheel, Ctrl+Plus / Minus | Zoom |
 | Ctrl+0 / Ctrl+1 / Ctrl+2 | Fit page, 100%, fit width |
+
+## License
+
+MIT, see [LICENSE](LICENSE). The parts Aiko is built on are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

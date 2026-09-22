@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Text;
 
 namespace AikoPdf.Services;
 
@@ -22,7 +20,7 @@ public static class Shell
     {
         try
         {
-            string full = LongPath(Path.GetFullPath(path));
+            string full = CanonicalPath(path);
             if (File.Exists(full))
             {
                 Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{full}\"") { UseShellExecute = true });
@@ -41,13 +39,37 @@ public static class Shell
         }
     }
 
-    private static string LongPath(string path)
+    /// <summary>
+    /// One spelling for a file's path: made absolute, with 8.3 short names expanded, so <c>C:\Users\ARTIST~1\a.pdf</c>
+    /// and <c>C:\Users\artistro08\a.pdf</c> compare as the same file.
+    /// </summary>
+    /// <param name="path">Any path Windows accepts.</param>
+    /// <returns>The full long path, or the path as given when it can't be expanded.</returns>
+    public static string CanonicalPath(string path)
     {
-        var buffer = new StringBuilder(1024);
-        uint length = GetLongPathNameW(path, buffer, (uint)buffer.Capacity);
-        return ((length > 0) && (length < buffer.Capacity)) ? buffer.ToString() : path;
+        try
+        {
+            return LongPath(Path.GetFullPath(path));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return path;
+        }
     }
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
-    private static extern uint GetLongPathNameW(string shortPath, StringBuilder longPath, uint length);
+    /// <summary>Expands 8.3 short names in a path. Paths longer than MAX_PATH work too: the buffer grows to fit.</summary>
+    /// <param name="path">A full path.</param>
+    /// <returns>The long form, or the path unchanged when Windows can't expand it.</returns>
+    private static string LongPath(string path)
+    {
+        uint needed = NativeMethods.GetLongPathName(path, null, 0);
+        if (needed == 0)
+        {
+            return path;
+        }
+
+        char[] buffer = new char[needed];
+        uint   length = NativeMethods.GetLongPathName(path, buffer, needed);
+        return ((length > 0) && (length < needed)) ? new string(buffer, 0, (int)length) : path;
+    }
 }

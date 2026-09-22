@@ -29,16 +29,6 @@
 
         <Canvas x:Name="SelectionLayer" IsHitTestVisible="False" />
 
-        <!-- Anchor Marker: a 1px point the ScrollViewer keeps in place when the page changes size; see SetAnchor -->
-        <Border
-            x:Name="AnchorMarker"
-            Width="1"
-            Height="1"
-            HorizontalAlignment="Left"
-            VerticalAlignment="Top"
-            IsHitTestVisible="False"
-            Visibility="Collapsed" />
-
         <ProgressRing
             x:Name="LoadingRing"
             IsActive="False"

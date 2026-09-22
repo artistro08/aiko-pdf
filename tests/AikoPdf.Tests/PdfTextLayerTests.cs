@@ -31,7 +31,7 @@ public sealed class PdfTextLayerTests : IDisposable
         selection.SelectAll();
 
         Assert.Equal(1, layer.PageCount);
-        Assert.Equal($"Hello World{Environment.NewLine}Second line here", selection.Text);
+        Assert.Equal($"Hello World{Environment.NewLine}Second line here", selection.GetText());
     }
 
     [Fact]
@@ -82,6 +82,16 @@ public sealed class PdfTextLayerTests : IDisposable
     }
 
     [Fact]
+    public void Dispose_Twice_IsSafe_AndLaterReadsThrow()
+    {
+        PdfTextLayer layer = PdfTextLayer.Open(Temp(SamplePdf.TwoLines()));
+        layer.Dispose();
+        layer.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => layer.GetGlyphs(1));
+    }
+
+    [Fact]
     public void Glyphs_AreCachedPerPage()
     {
         using PdfTextLayer layer = PdfTextLayer.Open(Temp(SamplePdf.TwoLines()));
@@ -121,7 +131,7 @@ public sealed class PdfTextLayerTests : IDisposable
         {
             var selection = new TextSelection(layer.GetGlyphs(i));
             selection.SelectAll();
-            Assert.Equal($"Page {i}", selection.Text);
+            Assert.Equal($"Page {i}", selection.GetText());
         }
     }
 
@@ -134,8 +144,8 @@ public sealed class PdfTextLayerTests : IDisposable
         selection.SelectAll();
 
         // Two lines: the selection breaks between the boxes and draws one rectangle per box, not one across both.
-        Assert.Equal($"Left box{Environment.NewLine}Right box", selection.Text);
-        Assert.Equal(2, selection.Rects.Count);
+        Assert.Equal($"Left box{Environment.NewLine}Right box", selection.GetText());
+        Assert.Equal(2, selection.GetRects().Count);
     }
 
     [Fact]
@@ -189,7 +199,7 @@ public sealed class PdfTextLayerTests : IDisposable
         var selection = new TextSelection(layer.GetGlyphs(1));
         selection.SelectAll();
 
-        Assert.Equal($"Hello World{Environment.NewLine}Second line here", selection.Text);
+        Assert.Equal($"Hello World{Environment.NewLine}Second line here", selection.GetText());
     }
 
     [Fact]

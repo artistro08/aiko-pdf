@@ -66,7 +66,6 @@ public sealed partial class PdfPageView : UserControl
     private Point                    lastClickPoint;
     private TextSelection?           selection;
     private bool                     dragging;
-    private double?                  anchorFraction;
 
     /// <summary>Creates the view for one page.</summary>
     /// <param name="session">The open document.</param>
@@ -81,7 +80,7 @@ public sealed partial class PdfPageView : UserControl
         rerenderTimer             = DispatcherQueue.CreateTimer();
         rerenderTimer.Interval    = TimeSpan.FromMilliseconds(120);
         rerenderTimer.IsRepeating = false;
-        rerenderTimer.Tick       += (_, _) => RenderIfNeeded();
+        rerenderTimer.Tick       += (_, _) => _ = RenderIfNeededAsync();
 
         SetScale(1);
         EffectiveViewportChanged += OnEffectiveViewportChanged;
@@ -89,10 +88,10 @@ public sealed partial class PdfPageView : UserControl
     }
 
     /// <summary>Raised when a drag selection starts on this page, so the viewer can clear the selection on any other page.</summary>
-    public event Action<PdfPageView>? SelectionStarted;
+    public event EventHandler? SelectionStarted;
 
     /// <summary>Raised once, when the page shows its first bitmap. The viewer counts these to lift its loading cover.</summary>
-    public event Action<PdfPageView>? FirstRendered;
+    public event EventHandler? FirstRendered;
 
     /// <summary>True once the page has shown a bitmap.</summary>
     public bool HasRendered { get; private set; }
@@ -104,7 +103,7 @@ public sealed partial class PdfPageView : UserControl
     public bool HasSelection => selection is { IsEmpty: false };
 
     /// <summary>The selected text, or an empty string.</summary>
-    public string SelectedText => selection?.Text ?? string.Empty;
+    public string SelectedText => selection?.GetText() ?? string.Empty;
 
     /// <summary>Resizes the page to the new zoom. The old bitmap is stretched at once and re-rendered shortly after.</summary>
     /// <param name="newScale">Device-independent pixels per PDF point.</param>
@@ -117,35 +116,11 @@ public sealed partial class PdfPageView : UserControl
         double pixels = XamlRoot?.RasterizationScale ?? 1;
         Width  = Math.Round(pageSize.Width * scale * pixels) / pixels;
         Height = Math.Round(pageSize.Height * scale * pixels) / pixels;
-        PlaceAnchor();
         RedrawSelection();
 
         // Debounced: one fresh render once the size has settled. The oversampled bitmap keeps its look meanwhile.
         rerenderTimer.Stop();
         rerenderTimer.Start();
-    }
-
-    /// <summary>
-    /// Marks the reader's spot on this page so the ScrollViewer's scroll anchoring holds it still when every page
-    /// changes size (a fit mode on resize, or a zoom). The marker sits that fraction of the way down the page and
-    /// scales with it, so the same line of text stays under the same point of the viewport. Only one page carries
-    /// the marker at a time; null removes it.
-    /// </summary>
-    /// <param name="fraction">0 for the page's top edge, 1 for its bottom, or null to clear.</param>
-    public void SetAnchor(double? fraction)
-    {
-        anchorFraction                = fraction;
-        AnchorMarker.Visibility       = fraction.HasValue ? Visibility.Visible : Visibility.Collapsed;
-        AnchorMarker.CanBeScrollAnchor = fraction.HasValue;
-        PlaceAnchor();
-    }
-
-    private void PlaceAnchor()
-    {
-        if (anchorFraction is { } fraction)
-        {
-            AnchorMarker.Margin = new Thickness(0, Math.Clamp(fraction, 0, 1) * Height, 0, 0);
-        }
     }
 
     /// <summary>Selects every glyph on the page.</summary>
@@ -156,7 +131,7 @@ public sealed partial class PdfPageView : UserControl
             return;
         }
 
-        SelectionStarted?.Invoke(this);
+        SelectionStarted?.Invoke(this, EventArgs.Empty);
         selection.SelectAll();
         RedrawSelection();
     }
@@ -188,10 +163,10 @@ public sealed partial class PdfPageView : UserControl
     private void OnEffectiveViewportChanged(FrameworkElement sender, EffectiveViewportChangedEventArgs args)
     {
         isNearViewport = args.BringIntoViewDistanceY <= NearDistance;
-        RenderIfNeeded();
+        _ = RenderIfNeededAsync();
         if (isNearViewport)
         {
-            EnsureGlyphs();
+            _ = EnsureGlyphsAsync();
         }
     }
 
@@ -204,7 +179,7 @@ public sealed partial class PdfPageView : UserControl
         LoadingRing.IsActive = false;
     }
 
-    private async void RenderIfNeeded()
+    private async Task RenderIfNeededAsync()
     {
         if (XamlRoot is null)
         {
@@ -261,7 +236,7 @@ public sealed partial class PdfPageView : UserControl
             if (!HasRendered)
             {
                 HasRendered = true;
-                FirstRendered?.Invoke(this);
+                FirstRendered?.Invoke(this, EventArgs.Empty);
             }
 
             // The white placeholder is only for the wait before the first render; once the bitmap is in, its own
@@ -294,7 +269,7 @@ public sealed partial class PdfPageView : UserControl
     // TEXT SELECTION
     // =========================================================================
 
-    private async void EnsureGlyphs()
+    private async Task EnsureGlyphsAsync()
     {
         if ((glyphs is not null) || loadingGlyphs || (session.TextLayer is null))
         {
@@ -330,7 +305,7 @@ public sealed partial class PdfPageView : UserControl
             return;
         }
 
-        SelectionStarted?.Invoke(this);
+        SelectionStarted?.Invoke(this, EventArgs.Empty);
         Point pagePoint = ToPagePoint(point.Position);
 
         // Presses close together in time and place count up the way Windows counts them: a double-click takes
@@ -377,16 +352,10 @@ public sealed partial class PdfPageView : UserControl
         double dy      = Math.Abs(point.Position.Y - lastClickPoint.Y) * scale;
 
         return (clickCount > 0)
-            && (elapsed <= GetDoubleClickTime())
-            && (dx <= GetSystemMetrics(DoubleClickWidth) / 2.0)
-            && (dy <= GetSystemMetrics(DoubleClickHeight) / 2.0);
+            && (elapsed <= NativeMethods.GetDoubleClickTime())
+            && (dx <= NativeMethods.GetSystemMetrics(DoubleClickWidth) / 2.0)
+            && (dy <= NativeMethods.GetSystemMetrics(DoubleClickHeight) / 2.0);
     }
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern uint GetDoubleClickTime();
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern int GetSystemMetrics(int index);
 
     /// <inheritdoc/>
     protected override void OnPointerMoved(PointerRoutedEventArgs e)
@@ -446,7 +415,7 @@ public sealed partial class PdfPageView : UserControl
         }
 
         var fill = (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"];
-        foreach (Rect rect in selection.Rects)
+        foreach (Rect rect in selection.GetRects())
         {
             var highlight = new Rectangle
             {

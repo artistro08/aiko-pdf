@@ -44,6 +44,16 @@ public sealed class AppSettingsTests : IDisposable
     }
 
     [Fact]
+    public void Save_LeavesNoTempFileBehind()
+    {
+        new AppSettings { Width = 1400, Height = 900 }.Save(StorePath);
+        new AppSettings { Width = 1200, Height = 800 }.Save(StorePath);
+
+        Assert.Equal(1200, AppSettings.Load(StorePath).Width);
+        Assert.Equal([StorePath], Directory.GetFiles(folder));
+    }
+
+    [Fact]
     public void HasSize_RejectsSizesBelowTheMinimum()
     {
         Assert.False(new AppSettings { Width = 100, Height = 100 }.HasSize);

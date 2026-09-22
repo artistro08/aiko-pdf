@@ -2,19 +2,6 @@ using System.Globalization;
 
 namespace AikoPdf.Pdf;
 
-/// <summary>How the zoom level is chosen.</summary>
-public enum ZoomMode
-{
-    /// <summary>The widest page fills the viewport width.</summary>
-    FitWidth,
-
-    /// <summary>The largest page fits inside the viewport in both directions.</summary>
-    FitPage,
-
-    /// <summary>A fixed scale the user picked; does not follow window resizes.</summary>
-    Custom,
-}
-
 /// <summary>
 /// Zoom math for the viewer: fit-to-viewport scales, stepping through preset levels and clamping. A scale of 1.0
 /// shows one PDF point as one device-independent pixel.
@@ -31,7 +18,7 @@ public static class Zoom
     public const double Max = 8.0;
 
     /// <summary>The levels the zoom in and zoom out buttons step through.</summary>
-    public static readonly double[] Presets = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0, 8.0];
+    public static IReadOnlyList<double> Presets { get; } = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0, 8.0];
 
     /// <summary>Keeps a scale inside the allowed range.</summary>
     /// <param name="scale">Any scale.</param>
@@ -91,7 +78,7 @@ public static class Zoom
     /// <returns>The last preset strictly less than <paramref name="current"/>, or <see cref="Min"/>.</returns>
     public static double StepOut(double current)
     {
-        for (int i = Presets.Length - 1; i >= 0; i--)
+        for (int i = Presets.Count - 1; i >= 0; i--)
         {
             if (Presets[i] < current - 0.001)
             {

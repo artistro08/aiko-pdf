@@ -35,6 +35,31 @@ public sealed class DefaultAppRegistrationTests : IDisposable
     }
 
     [Fact]
+    public void Register_GivesPdfsTheFileIconNotTheAppIcon()
+    {
+        const string exe = @"C:\Apps\Aiko\AikoPdf.exe";
+
+        DefaultAppRegistration.Register(root, exe);
+
+        Assert.Equal(
+            "\"C:\\Apps\\Aiko\\Assets\\AikoFile.ico\",0",
+            root.OpenSubKey($@"Software\Classes\{DefaultAppRegistration.ProgId}\DefaultIcon")!.GetValue(string.Empty));
+    }
+
+    [Fact]
+    public void IsRegistered_IsFalseWhileAnOlderRegistrationStillShowsTheAppIcon()
+    {
+        const string exe = @"C:\Apps\Aiko\AikoPdf.exe";
+        DefaultAppRegistration.Register(root, exe);
+        using (RegistryKey icon = root.CreateSubKey($@"Software\Classes\{DefaultAppRegistration.ProgId}\DefaultIcon"))
+        {
+            icon.SetValue(string.Empty, $"\"{exe}\",0");
+        }
+
+        Assert.False(DefaultAppRegistration.IsRegistered(root, exe));
+    }
+
+    [Fact]
     public void Register_IsIdempotentAndFollowsAMovedExecutable()
     {
         DefaultAppRegistration.Register(root, @"C:\Old\AikoPdf.exe");

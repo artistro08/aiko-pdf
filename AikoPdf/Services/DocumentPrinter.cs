@@ -86,13 +86,9 @@ public sealed class DocumentPrinter
         const uint EnumLocal         = 0x2;
         const int  ServerUnavailable = 1722;
 
-        bool listed = EnumPrinters(EnumLocal, null, 1, nint.Zero, 0, out uint _, out uint _);
+        bool listed = NativeMethods.EnumPrinters(EnumLocal, null, 1, nint.Zero, 0, out uint _, out uint _);
         return listed || (System.Runtime.InteropServices.Marshal.GetLastWin32Error() != ServerUnavailable);
     }
-
-    [System.Runtime.InteropServices.DllImport("winspool.drv", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
-    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-    private static extern bool EnumPrinters(uint flags, string? name, uint level, nint buffer, uint size, out uint needed, out uint returned);
 
     /// <summary>Renders one page as a print page, sized in device-independent pixels at 96 per inch.</summary>
     /// <param name="pageNumber">1-based page number.</param>
@@ -170,33 +166,5 @@ public sealed class DocumentPrinter
                 App.Log($"Printing {session.Path} failed.");
             }
         };
-    }
-}
-
-/// <summary>The Windows print spooler is stopped, so no printer can be reached.</summary>
-/// <remarks>
-/// @author Devin Green (Artistro08)
-/// </remarks>
-public sealed class PrintSpoolerStoppedException : Exception
-{
-    /// <summary>Creates the exception with its standard message.</summary>
-    public PrintSpoolerStoppedException()
-        : base("The Print Spooler service is not running.")
-    {
-    }
-
-    /// <summary>Creates the exception with a message.</summary>
-    /// <param name="message">What went wrong.</param>
-    public PrintSpoolerStoppedException(string message)
-        : base(message)
-    {
-    }
-
-    /// <summary>Creates the exception with a message and the failure behind it.</summary>
-    /// <param name="message">What went wrong.</param>
-    /// <param name="innerException">The underlying failure.</param>
-    public PrintSpoolerStoppedException(string message, Exception innerException)
-        : base(message, innerException)
-    {
     }
 }

@@ -294,67 +294,63 @@ public sealed class TextSelection
         focus       = -1;
     }
 
-    /// <summary>The selected text, with a space between words and a line break between lines.</summary>
-    public string Text
+    /// <summary>Builds the selected text, with a space between words and a line break between lines.</summary>
+    /// <returns>The text, or an empty string when nothing is selected.</returns>
+    public string GetText()
     {
-        get
+        if (IsEmpty)
         {
-            if (IsEmpty)
-            {
-                return string.Empty;
-            }
-
-            var text = new StringBuilder();
-            for (int i = Start; i <= End; i++)
-            {
-                TextGlyph glyph = glyphs[i];
-                if (i > Start)
-                {
-                    TextGlyph previous = glyphs[i - 1];
-                    if (previous.LineIndex != glyph.LineIndex)
-                    {
-                        text.Append(Environment.NewLine);
-                    }
-                    else if (previous.WordIndex != glyph.WordIndex)
-                    {
-                        text.Append(' ');
-                    }
-                }
-
-                text.Append(glyph.Text);
-            }
-
-            return text.ToString();
+            return string.Empty;
         }
+
+        var text = new StringBuilder();
+        for (int i = Start; i <= End; i++)
+        {
+            TextGlyph glyph = glyphs[i];
+            if (i > Start)
+            {
+                TextGlyph previous = glyphs[i - 1];
+                if (previous.LineIndex != glyph.LineIndex)
+                {
+                    text.Append(Environment.NewLine);
+                }
+                else if (previous.WordIndex != glyph.WordIndex)
+                {
+                    text.Append(' ');
+                }
+            }
+
+            text.Append(glyph.Text);
+        }
+
+        return text.ToString();
     }
 
-    /// <summary>One highlight rectangle per selected line, spanning the selected glyphs and the line's full height.</summary>
-    public IReadOnlyList<Rect> Rects
+    /// <summary>Builds one highlight rectangle per selected line, spanning the selected glyphs and the line's full height.</summary>
+    /// <returns>The rectangles in rendered page coordinates; empty when nothing is selected.</returns>
+    public IReadOnlyList<Rect> GetRects()
     {
-        get
+        if (IsEmpty)
         {
-            if (IsEmpty)
-            {
-                return [];
-            }
-
-            var rects = new List<Rect>();
-            foreach (LineBand line in lines)
-            {
-                int first = Math.Max(line.First, Start);
-                int last  = Math.Min(line.Last, End);
-                if (first > last)
-                {
-                    continue;
-                }
-
-                double left  = glyphs[first].Bounds.Left;
-                double right = glyphs[last].Bounds.Right;
-                rects.Add(new Rect(left, line.Top, Math.Max(0, right - left), line.Bottom - line.Top));
-            }
-
-            return rects;
+            return [];
         }
+
+        var rects = new List<Rect>();
+        foreach (LineBand line in lines)
+        {
+            int first = Math.Max(line.First, Start);
+            int last  = Math.Min(line.Last, End);
+            if (first > last)
+            {
+                continue;
+            }
+
+            double left  = glyphs[first].Bounds.Left;
+            double right = glyphs[last].Bounds.Right;
+            rects.Add(new Rect(left, line.Top, Math.Max(0, right - left), line.Bottom - line.Top));
+        }
+
+        return rects;
     }
 
     /// <summary>

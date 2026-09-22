@@ -24,7 +24,7 @@ public sealed partial class HomePage : Page
         Loaded += (_, _) =>
         {
             App.Recent.Prune();
-            App.Recent.Changed += Refresh;
+            App.Recent.Changed += OnRecentChanged;
             Refresh();
             SizeRecentPanel(ActualWidth);
 
@@ -32,7 +32,7 @@ public sealed partial class HomePage : Page
             // panel's top edge.
             fade ??= ScrollFade.Attach(RecentSection, RecentSection, RecentFade, topLength: 24, bottomLength: 32);
         };
-        Unloaded += (_, _) => App.Recent.Changed -= Refresh;
+        Unloaded += (_, _) => App.Recent.Changed -= OnRecentChanged;
     }
 
     // Card width (the 120 preview plus the button's padding), the gap between cards, and the panel's inner margin.
@@ -73,6 +73,8 @@ public sealed partial class HomePage : Page
             ? new BitmapImage(new Uri(png)) { CreateOptions = BitmapCreateOptions.IgnoreImageCache }
             : null;
     }
+
+    private void OnRecentChanged(object? sender, EventArgs e) => Refresh();
 
     private void Refresh()
     {

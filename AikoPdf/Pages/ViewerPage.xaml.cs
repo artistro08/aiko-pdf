@@ -51,17 +51,16 @@ public sealed partial class ViewerPage : Page
     private double       scale = 1;
     private int          currentPage = 1;
 
-    // Where the reader is: the page under a point a third of the way down the viewport (matching the ScrollViewer's
-    // VerticalAnchorRatio) and how far into that page the point sits. The page carrying the anchor marker is the
-    // one the ScrollViewer holds still when every page changes size.
-    private const double AnchorRatio = 0.33;
-    private PdfPageView? anchorPage;
+    // The offset the last zoom or resize asked for. ChangeView lands on a later tick, and a live window drag fires
+    // several resizes before then; reading the stale offset in between walked the view up or down the document.
+    private double?      pendingOffset;
 
     /// <summary>Slides the sidebar island out to the left while its column closes, and back in when it opens.</summary>
     public Microsoft.UI.Xaml.Media.TranslateTransform SidebarSlide { get; } = new();
     private PdfPageView? selectionPage;
     private int          renderedPages;
     private ScrollFade?  thumbnailFade;
+    private ScrollFade?  pageFade;
     private Microsoft.UI.Xaml.Media.Animation.Storyboard? coverFade;
     private bool         sidebarOpen = true;
     private Microsoft.UI.Xaml.Media.Animation.Storyboard? sidebarSlide;
@@ -83,7 +82,7 @@ public sealed partial class ViewerPage : Page
     /// of a shorter document. By then the pages right around the reader are ready and the rest fill in far ahead
     /// of any scrolling.
     /// </summary>
-    private void OnPageFirstRendered(PdfPageView page)
+    private void OnPageFirstRendered(object? sender, EventArgs e)
     {
         const int PagesBeforeReading = 10;
 
@@ -140,6 +139,9 @@ public sealed partial class ViewerPage : Page
             thumbnailFade = ScrollFade.Attach(ThumbnailList, thumbnails, ThumbnailFade, topLength: 28, bottomLength: 28);
         }
 
+        // Same fade on the pages themselves.
+        pageFade ??= ScrollFade.Attach(Scroller, Scroller, PageFade, topLength: 32, bottomLength: 32);
+
         AddAccelerator(VirtualKey.C, VirtualKeyModifiers.Control, () => selectionPage?.CopySelection());
         AddAccelerator(VirtualKey.A, VirtualKeyModifiers.Control, () => pages[currentPage - 1].SelectAll());
         AddAccelerator(VirtualKey.Add, VirtualKeyModifiers.Control, ZoomIn);
@@ -178,42 +180,35 @@ public sealed partial class ViewerPage : Page
         double viewport = (Scroller.ViewportWidth > 0) ? Scroller.ViewportWidth : Scroller.ActualWidth;
         double height   = (Scroller.ViewportHeight > 0) ? Scroller.ViewportHeight : Scroller.ActualHeight;
 
-        SetScale(Zoom.Fit(zoomMode, largest.Width, largest.Height, viewport, height, PagePadding, scale), anchorY: null, snapToPage);
+        SetScale(Zoom.Fit(zoomMode, largest.Width, largest.Height, viewport, height, PagePadding, scale), anchorY: snapToPage ? null : 0);
         UpdateZoomCombo();
     }
 
     /// <summary>
-    /// Applies a scale to every page and puts the view back where it belongs:
-    /// with an anchor (the pointer during wheel zoom) whatever sits under it stays put; with snap, the top of the
-    /// current page; otherwise the same spot within the same page, which is what keeps a window resize from
-    /// jumping between pages.
+    /// Applies a scale to every page and puts the view back where it belongs: with an anchor, whatever sits at that
+    /// height in the viewport stays put (the pointer during wheel zoom, the top line during a window resize);
+    /// without one, the top of the current page.
     /// </summary>
+    /// <remarks>
+    /// The ScrollViewer's own scroll anchoring is left off on purpose. During a live window drag it sees the viewport
+    /// change a pass before the pages resize, corrects for each separately, and gets clamped at the top of the
+    /// document, so every drag walked the view up the page. Setting the offset here, in the same pass as the new
+    /// page sizes, lands on the same line every time.
+    /// </remarks>
     /// <param name="newScale">The scale to apply.</param>
-    /// <param name="anchorY">Viewport y position to hold still, or null.</param>
-    /// <param name="snapToPage">Without an anchor: true snaps to the current page's top, false keeps the position.</param>
-    private void SetScale(double newScale, double? anchorY, bool snapToPage = true)
+    /// <param name="anchorY">Viewport y position to hold still, or null to snap to the current page's top.</param>
+    private void SetScale(double newScale, double? anchorY)
     {
         if (Math.Abs(newScale - scale) < 0.0001)
         {
             return;
         }
 
-        // A resize keeps the reading spot through the ScrollViewer's scroll anchoring (the marker placed by
-        // RememberAnchor), which moves the offset in the same layout pass as the page sizes. Wheel and slider zoom
-        // and a chosen fit mode are discrete jumps, so they set the offset themselves; the marker comes off first
-        // or the two adjustments would stack and throw the view down the page.
-        double offset = Scroller.VerticalOffset;
-        bool   resize = !snapToPage && (anchorY is null);
-        if (!resize)
-        {
-            anchorPage?.SetAnchor(null);
-            anchorPage = null;
-        }
-
         // Where the held point sits in the document: which page, and how far down it. Scaling the raw offset
         // instead would count the padding and the gaps between pages as if they zoomed too, which walks the view
         // several pages down a long document.
-        (int held, double fraction) = (anchorY is { } held_y) ? PageFractionAt(offset + held_y) : (0, 0);
+        double offset = pendingOffset ?? Scroller.VerticalOffset;
+        (int held, double fraction) = (anchorY is { } heldY) ? PageFractionAt(offset + heldY) : (0, 0);
 
         scale = newScale;
         foreach (PdfPageView page in pages)
@@ -221,16 +216,14 @@ public sealed partial class ViewerPage : Page
             page.SetScale(scale);
         }
 
-        if (resize)
-        {
-            return;
-        }
-
+        // Worked out from the page heights just set, not from layout: during a window resize this runs inside a
+        // layout pass, where UpdateLayout does nothing and every page position would still be the old one.
         Scroller.UpdateLayout();
         double target = (anchorY is { } y)
-            ? pages[held].ActualOffset.Y + (fraction * pages[held].ActualHeight) - y
+            ? LaidOutTop(held) + (fraction * pages[held].Height) - y
             : PageTop(currentPage);
-        Scroller.ChangeView(null, Math.Max(0, target), null, disableAnimation: true);
+        pendingOffset = Math.Max(0, target);
+        Scroller.ChangeView(null, pendingOffset, null, disableAnimation: true);
     }
 
     /// <summary>Which page a content position falls in, and how far down that page it sits.</summary>
@@ -238,52 +231,29 @@ public sealed partial class ViewerPage : Page
     /// <returns>The page's index in <c>pages</c>, and the fraction of its height, clamped to the page.</returns>
     private (int Index, double Fraction) PageFractionAt(double contentY)
     {
-        int index = pages.Count - 1;
+        double top = 0;
         for (int i = 0; i < pages.Count; i++)
         {
-            if (contentY < pages[i].ActualOffset.Y + pages[i].ActualHeight)
+            double height = pages[i].Height;
+            if ((contentY < top + height) || (i == pages.Count - 1))
             {
-                index = i;
-                break;
+                return (i, (height > 0) ? Math.Clamp((contentY - top) / height, 0, 1) : 0);
             }
+
+            top += height + PageStack.Spacing;
         }
 
-        PdfPageView page = pages[index];
-        double fraction  = (page.ActualHeight > 0) ? Math.Clamp((contentY - page.ActualOffset.Y) / page.ActualHeight, 0, 1) : 0;
-        return (index, fraction);
+        return (0, 0);
     }
 
-    /// <summary>Puts the anchor marker on the page under a content offset, at that offset's fraction of the page.</summary>
-    /// <param name="contentY">A position in the scrolled content, in device-independent pixels.</param>
-    private void MarkAnchor(double contentY)
-    {
-        if (pages.Count == 0)
-        {
-            return;
-        }
-
-        PdfPageView target = pages[^1];
-        foreach (PdfPageView page in pages)
-        {
-            if (contentY < page.ActualOffset.Y + page.ActualHeight)
-            {
-                target = page;
-                break;
-            }
-        }
-
-        if (!ReferenceEquals(anchorPage, target))
-        {
-            anchorPage?.SetAnchor(null);
-            anchorPage = target;
-        }
-
-        target.SetAnchor((target.ActualHeight > 0) ? Math.Clamp((contentY - target.ActualOffset.Y) / target.ActualHeight, 0, 1) : 0);
-    }
-
-    /// <summary>Records where the reader is, from the live scroll offset.</summary>
-    private void RememberAnchor()
-        => MarkAnchor(Scroller.VerticalOffset + (Scroller.ViewportHeight * AnchorRatio));
+    /// <summary>
+    /// Where a page's top edge sits in the scrolled content, from the page heights rather than the last layout pass:
+    /// the stack has no padding above, and pages are separated by its spacing.
+    /// </summary>
+    /// <param name="index">The page's index in <c>pages</c>.</param>
+    /// <returns>The offset in device-independent pixels.</returns>
+    private double LaidOutTop(int index)
+        => pages.Take(index).Sum(p => p.Height + PageStack.Spacing);
 
     private void SetZoomMode(ZoomMode mode)
     {
@@ -399,8 +369,6 @@ public sealed partial class ViewerPage : Page
     /// <summary>Works out which page sits a third of the way down the viewport and reflects it in the status bar and sidebar.</summary>
     private void UpdateCurrentPage()
     {
-        RememberAnchor();
-
         double probe = Scroller.VerticalOffset + (Scroller.ViewportHeight / 3);
         int    found = pages.Count;
         for (int i = 0; i < pages.Count; i++)
@@ -526,6 +494,7 @@ public sealed partial class ViewerPage : Page
         if (!e.IsIntermediate)
         {
             scrollingFromSidebar = false;
+            pendingOffset        = null;
         }
 
         UpdateCurrentPage();
@@ -600,8 +569,9 @@ public sealed partial class ViewerPage : Page
     // SELECTION AND SIDEBAR
     // =========================================================================
 
-    private void OnSelectionStarted(PdfPageView page)
+    private void OnSelectionStarted(object? sender, EventArgs e)
     {
+        var page = (PdfPageView)sender!;
         // One selection at a time across the document.
         // ponytail: a drag can't continue across a page boundary. Add cross-page ranges if readers ask for it.
         if (!ReferenceEquals(selectionPage, page))

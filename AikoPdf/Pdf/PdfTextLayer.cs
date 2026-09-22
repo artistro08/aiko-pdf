@@ -22,6 +22,9 @@ public sealed class PdfTextLayer : IDisposable
     // and divided back down: positions stay accurate to a hundredth of a point.
     private const int Precision = 100;
 
+    // Most outline entries read from one file, however it is nested or looped.
+    private const int MaxOutlineEntries = 10_000;
+
     private readonly nint                                      document;
     private readonly Dictionary<int, IReadOnlyList<TextGlyph>> cache      = [];
     private readonly Dictionary<int, IReadOnlyList<Rect>>      containers = [];
@@ -36,7 +39,6 @@ public sealed class PdfTextLayer : IDisposable
         this.document = document;
         this.data     = data;
         PageCount     = Pdfium.FPDF_GetPageCount(document);
-        ReadOutline(Pdfium.FPDFBookmark_GetFirstChild(document, nint.Zero), depth: 0);
     }
 
     /// <summary>Number of pages in the document.</summary>
@@ -73,7 +75,20 @@ public sealed class PdfTextLayer : IDisposable
             nint document = Pdfium.FPDF_LoadMemDocument64(data, (nuint)bytes.Length, password);
             if (document != nint.Zero)
             {
-                return new PdfTextLayer(document, data);
+                // The constructor only stores the handles, so once it returns the layer owns them and its Dispose
+                // (or finalizer) frees them exactly once, whatever fails after.
+                var layer = new PdfTextLayer(document, data);
+                try
+                {
+                    int budget = MaxOutlineEntries;
+                    layer.ReadOutline(Pdfium.FPDFBookmark_GetFirstChild(document, nint.Zero), depth: 0, ref budget);
+                    return layer;
+                }
+                catch
+                {
+                    layer.Dispose();
+                    throw;
+                }
             }
 
             uint error = Pdfium.FPDF_GetLastError();
@@ -156,8 +171,21 @@ public sealed class PdfTextLayer : IDisposable
         }
     }
 
+    /// <summary>Closes the document in PDFium and frees the file's bytes, if a caller never disposed it.</summary>
+    ~PdfTextLayer()
+    {
+        Release();
+    }
+
     /// <inheritdoc/>
     public void Dispose()
+    {
+        Release();
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>Closes the document and frees its bytes, once; later calls do nothing.</summary>
+    private void Release()
     {
         lock (Pdfium.Gate)
         {
@@ -485,14 +513,15 @@ public sealed class PdfTextLayer : IDisposable
     /// Walks the outline depth first. The first entry that points at a page names that page; later ones pointing
     /// at the same page don't replace it.
     /// </summary>
-    private void ReadOutline(nint bookmark, int depth)
+    /// <param name="bookmark">The first bookmark at this level.</param>
+    /// <param name="depth">How deep this level is.</param>
+    /// <param name="budget">Entries left to read across the whole outline; counts down as the walk goes.</param>
+    private void ReadOutline(nint bookmark, int depth, ref int budget)
     {
-        // Outlines can be deep and, when damaged, circular; this caps the walk either way.
-        const int MaxDepth   = 32;
-        const int MaxEntries = 10_000;
+        // Outlines can be deep and, when damaged, circular; the depth limit and the shared budget cap the walk.
+        const int MaxDepth = 32;
 
-        int visited = 0;
-        while ((bookmark != nint.Zero) && (depth <= MaxDepth) && (visited++ < MaxEntries))
+        while ((bookmark != nint.Zero) && (depth <= MaxDepth) && (budget-- > 0))
         {
             string title = Pdfium.BookmarkTitle(bookmark).Trim();
             nint   dest  = Pdfium.FPDFBookmark_GetDest(document, bookmark);
@@ -508,7 +537,7 @@ public sealed class PdfTextLayer : IDisposable
                 pageNames.TryAdd(index + 1, title);
             }
 
-            ReadOutline(Pdfium.FPDFBookmark_GetFirstChild(document, bookmark), depth + 1);
+            ReadOutline(Pdfium.FPDFBookmark_GetFirstChild(document, bookmark), depth + 1, ref budget);
             bookmark = Pdfium.FPDFBookmark_GetNextSibling(document, bookmark);
         }
     }

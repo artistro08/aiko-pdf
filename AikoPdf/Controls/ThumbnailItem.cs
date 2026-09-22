@@ -61,6 +61,11 @@ public sealed class ThumbnailItem : INotifyPropertyChanged
     /// <summary>Thumbnail height in device-independent pixels, from the page's aspect ratio.</summary>
     public double Height { get; }
 
+    /// <summary>What a screen reader announces for the entry: the page label, then the outline's name for it.</summary>
+    /// <returns>"Page 3", or "Page 3, Introduction".</returns>
+    public override string ToString()
+        => string.IsNullOrEmpty(Title) ? PageLabel : $"{PageLabel}, {Title}";
+
     /// <summary>The rendered thumbnail. Null until the first read has finished rendering it; then the change is raised.</summary>
     public BitmapImage? Image
     {

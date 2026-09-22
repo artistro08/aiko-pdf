@@ -32,8 +32,8 @@ public class TextSelectionTests
         selection.Begin(new Point(5, 5));
 
         Assert.True(selection.IsEmpty);
-        Assert.Equal(string.Empty, selection.Text);
-        Assert.Empty(selection.Rects);
+        Assert.Equal(string.Empty, selection.GetText());
+        Assert.Empty(selection.GetRects());
     }
 
     [Fact]
@@ -50,8 +50,8 @@ public class TextSelectionTests
     {
         TextSelection selection = Drag(new Point(5, 5), new Point(45, 5));
 
-        Assert.Equal("Hi yo", selection.Text);
-        Assert.Equal([new Rect(0, 0, 50, 10)], selection.Rects);
+        Assert.Equal("Hi yo", selection.GetText());
+        Assert.Equal([new Rect(0, 0, 50, 10)], selection.GetRects());
     }
 
     [Fact]
@@ -59,14 +59,14 @@ public class TextSelectionTests
     {
         TextSelection selection = Drag(new Point(15, 5), new Point(15, 25));
 
-        Assert.Equal($"i yo{Environment.NewLine}ok", selection.Text);
-        Assert.Equal([new Rect(10, 0, 40, 10), new Rect(0, 20, 20, 10)], selection.Rects);
+        Assert.Equal($"i yo{Environment.NewLine}ok", selection.GetText());
+        Assert.Equal([new Rect(10, 0, 40, 10), new Rect(0, 20, 20, 10)], selection.GetRects());
     }
 
     [Fact]
     public void DraggingBackwards_SelectsTheSameRange()
     {
-        Assert.Equal(Drag(new Point(15, 5), new Point(15, 25)).Text, Drag(new Point(15, 25), new Point(15, 5)).Text);
+        Assert.Equal(Drag(new Point(15, 5), new Point(15, 25)).GetText(), Drag(new Point(15, 25), new Point(15, 5)).GetText());
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public class TextSelectionTests
     {
         TextSelection selection = Drag(new Point(-50, 5), new Point(500, 5));
 
-        Assert.Equal("Hi yo", selection.Text);
+        Assert.Equal("Hi yo", selection.GetText());
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public class TextSelectionTests
         // x = 22 is closer to "i" (center 15) than to "y" (center 35).
         TextSelection selection = Drag(new Point(5, 5), new Point(22, 5));
 
-        Assert.Equal("Hi", selection.Text);
+        Assert.Equal("Hi", selection.GetText());
     }
 
     [Fact]
@@ -91,7 +91,7 @@ public class TextSelectionTests
     {
         TextSelection selection = Drag(new Point(5, 5), new Point(5, 500));
 
-        Assert.Equal($"Hi yo{Environment.NewLine}o", selection.Text);
+        Assert.Equal($"Hi yo{Environment.NewLine}o", selection.GetText());
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public class TextSelectionTests
         var selection = new TextSelection(Glyphs);
         selection.SelectAll();
 
-        Assert.Equal($"Hi yo{Environment.NewLine}ok", selection.Text);
+        Assert.Equal($"Hi yo{Environment.NewLine}ok", selection.GetText());
         Assert.Equal(0, selection.Start);
         Assert.Equal(5, selection.End);
     }
@@ -137,10 +137,10 @@ public class TextSelectionTests
 
         // Through the gap between the right box's rows (nearer the second), then past the end of its second row.
         selection.Extend(new Point(112, 16));
-        Assert.Equal($"B1{Environment.NewLine}B2", selection.Text);
+        Assert.Equal($"B1{Environment.NewLine}B2", selection.GetText());
 
         selection.Extend(new Point(200, 25));
-        Assert.Equal($"B1{Environment.NewLine}B2", selection.Text);
+        Assert.Equal($"B1{Environment.NewLine}B2", selection.GetText());
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public class TextSelectionTests
         selection.Begin(new Point(5, 5));
         selection.Extend(new Point(15, 25));
 
-        Assert.Equal($"A1{Environment.NewLine}A2", selection.Text);
+        Assert.Equal($"A1{Environment.NewLine}A2", selection.GetText());
     }
 
     [Fact]
@@ -195,8 +195,8 @@ public class TextSelectionTests
         selection.Begin(new Point(2, 12));
         selection.Extend(new Point(50, 30));
         selection.Extend(new Point(85, 58));
-        Assert.Equal($"TA{Environment.NewLine}r1x{Environment.NewLine}r2", selection.Text);
-        Assert.All(selection.Rects, rect => Assert.True(rect.Right <= 60));
+        Assert.Equal($"TA{Environment.NewLine}r1x{Environment.NewLine}r2", selection.GetText());
+        Assert.All(selection.GetRects(), rect => Assert.True(rect.Right <= 60));
     }
 
     [Fact]
@@ -217,7 +217,7 @@ public class TextSelectionTests
         selection.Extend(new Point(88, 64));
 
         // Level with card B's extra row, still inside card A: card A's last row, not B's.
-        Assert.Equal($"TA{Environment.NewLine}r1x{Environment.NewLine}r2", selection.Text);
+        Assert.Equal($"TA{Environment.NewLine}r1x{Environment.NewLine}r2", selection.GetText());
     }
 
     [Fact]
@@ -248,7 +248,7 @@ public class TextSelectionTests
         Assert.True(selection.IsEmpty);
 
         selection.Extend(new Point(15, 5));
-        Assert.Equal("Hi", selection.Text);
+        Assert.Equal("Hi", selection.GetText());
     }
 
     [Fact]
@@ -257,10 +257,10 @@ public class TextSelectionTests
         var selection = new TextSelection(Glyphs);
 
         selection.SelectWord(new Point(45, 5));
-        Assert.Equal("yo", selection.Text);
+        Assert.Equal("yo", selection.GetText());
 
         selection.SelectWord(new Point(2, 25));
-        Assert.Equal("ok", selection.Text);
+        Assert.Equal("ok", selection.GetText());
     }
 
     [Fact]
@@ -269,7 +269,7 @@ public class TextSelectionTests
         var selection = new TextSelection(Glyphs);
         selection.SelectWord(new Point(22, 5));
 
-        Assert.Equal("Hi", selection.Text);
+        Assert.Equal("Hi", selection.GetText());
     }
 
     [Fact]
@@ -287,10 +287,10 @@ public class TextSelectionTests
         var selection = new TextSelection(glyphs);
 
         selection.SelectParagraph(new Point(50, 20));
-        Assert.Equal($"a{Environment.NewLine}b{Environment.NewLine}c", selection.Text);
+        Assert.Equal($"a{Environment.NewLine}b{Environment.NewLine}c", selection.GetText());
 
         selection.SelectParagraph(new Point(50, 4));
-        Assert.Equal("T", selection.Text);
+        Assert.Equal("T", selection.GetText());
     }
 
     [Fact]
@@ -300,13 +300,13 @@ public class TextSelectionTests
 
         // Card A's rows, and nothing from card B or card A's much smaller label.
         selection.SelectParagraph(new Point(12, 26));
-        Assert.Contains($"r1x{Environment.NewLine}r2", selection.Text, StringComparison.Ordinal);
-        Assert.DoesNotContain("s", selection.Text, StringComparison.Ordinal);
-        Assert.False(selection.Text.StartsWith('a'));
+        Assert.Contains($"r1x{Environment.NewLine}r2", selection.GetText(), StringComparison.Ordinal);
+        Assert.DoesNotContain("s", selection.GetText(), StringComparison.Ordinal);
+        Assert.False(selection.GetText().StartsWith('a'));
 
         selection.SelectParagraph(new Point(112, 40));
-        Assert.DoesNotContain("r", selection.Text, StringComparison.Ordinal);
-        Assert.Contains("s", selection.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("r", selection.GetText(), StringComparison.Ordinal);
+        Assert.Contains("s", selection.GetText(), StringComparison.Ordinal);
     }
 
     // A page of plain text shaped like the school syllabus this was measured on: one line on its own, a two-line
@@ -348,7 +348,7 @@ public class TextSelectionTests
         var selection = new TextSelection(Syllabus());
         selection.SelectParagraph(new Point(20, y));
 
-        Assert.Equal(expected.Replace("|", Environment.NewLine, StringComparison.Ordinal), selection.Text);
+        Assert.Equal(expected.Replace("|", Environment.NewLine, StringComparison.Ordinal), selection.GetText());
     }
 
     [Fact]
@@ -363,7 +363,7 @@ public class TextSelectionTests
 
         Assert.True(selection.IsEmpty);
         Assert.Equal(-1, selection.HitTest(new Point(5, 5)));
-        Assert.Empty(selection.Rects);
-        Assert.Equal(string.Empty, selection.Text);
+        Assert.Empty(selection.GetRects());
+        Assert.Equal(string.Empty, selection.GetText());
     }
 }
