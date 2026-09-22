@@ -486,10 +486,11 @@ public sealed partial class ViewerPage : Page
             target = scroller.VerticalOffset + (bottom - height) + gap;
         }
 
-        // Clamped and instant: an animated move past either end of the list overshoots and springs back.
+        // Animated, so the list glides to the new page instead of jumping. The target is clamped to the list's
+        // real range first: an animated move aimed past either end is what overshot and sprang back before.
         if (target is { } offset)
         {
-            scroller.ChangeView(null, Math.Clamp(offset, 0, scroller.ScrollableHeight), null, disableAnimation: true);
+            scroller.ChangeView(null, Math.Clamp(offset, 0, scroller.ScrollableHeight), null, disableAnimation: false);
         }
     }
 

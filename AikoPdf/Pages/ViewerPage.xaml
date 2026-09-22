@@ -59,10 +59,38 @@
                     PointerEntered="OnThumbnailListPointerEntered"
                     PointerExited="OnThumbnailListPointerExited">
                     <ListView.ItemContainerStyle>
+                        <!-- The stock template never hands the item's corner radius to the part that paints the
+                             hover and selection backgrounds, so they came out square; this one passes it through. -->
                         <Style TargetType="ListViewItem">
                             <Setter Property="HorizontalContentAlignment" Value="Center" />
                             <Setter Property="Padding" Value="8,12,8,8" />
                             <Setter Property="CornerRadius" Value="6" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListViewItem">
+                                        <ListViewItemPresenter
+                                            CornerRadius="{TemplateBinding CornerRadius}"
+                                            ContentMargin="{TemplateBinding Padding}"
+                                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                            ContentTransitions="{TemplateBinding ContentTransitions}"
+                                            Control.IsTemplateFocusTarget="True"
+                                            FocusVisualMargin="{TemplateBinding FocusVisualMargin}"
+                                            SelectionCheckMarkVisualEnabled="False"
+                                            CheckMode="Overlay"
+                                            PointerOverBackground="{ThemeResource ListViewItemBackgroundPointerOver}"
+                                            PointerOverForeground="{ThemeResource ListViewItemForegroundPointerOver}"
+                                            SelectedBackground="{ThemeResource ListViewItemBackgroundSelected}"
+                                            SelectedForeground="{ThemeResource ListViewItemForegroundSelected}"
+                                            SelectedPointerOverBackground="{ThemeResource ListViewItemBackgroundSelectedPointerOver}"
+                                            PressedBackground="{ThemeResource ListViewItemBackgroundPressed}"
+                                            SelectedPressedBackground="{ThemeResource ListViewItemBackgroundSelectedPressed}"
+                                            DisabledOpacity="{ThemeResource ListViewItemDisabledThemeOpacity}"
+                                            FocusBorderBrush="{ThemeResource ListViewItemFocusBorderBrush}"
+                                            FocusSecondaryBorderBrush="{ThemeResource ListViewItemFocusSecondaryBorderBrush}" />
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
                         </Style>
                     </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
