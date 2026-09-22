@@ -158,6 +158,11 @@ public sealed partial class MainWindow : Window
             : (AppSettings.DefaultWidth, AppSettings.DefaultHeight);
         Resize((int)Math.Round(width * scale), (int)Math.Round(height * scale));
 
+        // The floor applies from the first moment, not only once the home page has measured itself. A window
+        // opened straight into a PDF used to have none, could be dragged smaller than a saved size is trusted at,
+        // and the next window then threw that size away and opened at the default.
+        SetMinimumSize(AppSettings.MinimumWidth, AppSettings.MinimumHeight);
+
         if (App.Settings.IsMaximized)
         {
             presenter.Maximize();
@@ -245,9 +250,10 @@ public sealed partial class MainWindow : Window
         App.Settings.IsMaximized = maximized;
         if (!maximized)
         {
+            // Never stored below the floor, so whatever is saved is a size the next window will actually use.
             double scale        = DisplayScale;
-            App.Settings.Width  = (int)Math.Round(AppWindow.Size.Width / scale);
-            App.Settings.Height = (int)Math.Round(AppWindow.Size.Height / scale);
+            App.Settings.Width  = Math.Max(AppSettings.MinimumWidth, (int)Math.Round(AppWindow.Size.Width / scale));
+            App.Settings.Height = Math.Max(AppSettings.MinimumHeight, (int)Math.Round(AppWindow.Size.Height / scale));
         }
 
         App.Settings.Save(AppSettings.DefaultPath);
