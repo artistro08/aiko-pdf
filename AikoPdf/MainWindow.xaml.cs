@@ -464,10 +464,11 @@ public sealed partial class MainWindow : Window
     {
         var dialog = new ContentDialog
         {
-            XamlRoot        = Content.XamlRoot,
-            Title           = title,
-            Content         = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
-            CloseButtonText = "OK",
+            XamlRoot            = Content.XamlRoot,
+            Title               = title,
+            Content             = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
+            PrimaryButtonText   = "OK",
+            DefaultButton       = ContentDialogButton.Primary,
         };
         await dialog.ShowAsync();
     }
