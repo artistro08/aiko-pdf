@@ -74,8 +74,8 @@ public sealed class DefaultAppRegistrationTests : IDisposable
     {
         // The "!" is escaped: Settings ignores the app and shows the whole list when it is not.
         Assert.Equal(
-            "ms-settings:defaultapps?registeredAUMID=Artistro08.Aiko_abc123%21Aiko",
-            DefaultAppRegistration.SettingsUriFor("Artistro08.Aiko_abc123!Aiko").OriginalString);
+            "ms-settings:defaultapps?registeredAUMID=artistro08.AikoPDF_80wzptmyxepxj%21Aiko",
+            DefaultAppRegistration.SettingsUriFor("artistro08.AikoPDF_80wzptmyxepxj!Aiko").OriginalString);
     }
 
     [Fact]

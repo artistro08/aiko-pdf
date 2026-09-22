@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  MSIX manifest for Aiko. The build stamps the version in from tools/build-release.ps1 and lays the package out
-  itself, which is what makes the app's XAML resolvable under package identity. Windows takes the PDF association
-  from here, so a packaged install needs none of the registry writes the portable build makes.
+  MSIX manifest for Aiko. The identity and publisher are the ones Partner Center reserved for the Store listing
+  (Store ID 9MXL507LV5GG), and the display names must match the reserved name, "Aiko PDF". The build stamps the
+  version in from tools/build-release.ps1 and lays the package out itself, which is what makes the app's XAML
+  resolvable under package identity. Windows takes the PDF association from here, so a packaged install needs
+  none of the registry writes the portable build makes.
 -->
 <Package
     xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -12,19 +14,19 @@
     IgnorableNamespaces="uap uap3 rescap">
 
     <Identity
-        Name="Artistro08.Aiko"
-        Publisher="CN=Devin Green"
+        Name="artistro08.AikoPDF"
+        Publisher="CN=BF59F607-536B-4252-888F-7B3ED9D56F96"
         Version="1.0.0.0"
         ProcessorArchitecture="x64" />
 
     <Properties>
-        <DisplayName>Aiko</DisplayName>
-        <PublisherDisplayName>Devin Green</PublisherDisplayName>
+        <DisplayName>Aiko PDF</DisplayName>
+        <PublisherDisplayName>artistro08</PublisherDisplayName>
         <Logo>Assets\StoreLogo.png</Logo>
     </Properties>
 
     <Dependencies>
-        <TargetDeviceFamily Name="Windows.Desktop" MinVersion="1.0.0.0" MaxVersionTested="10.0.26100.0" />
+        <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
     </Dependencies>
 
     <Resources>
@@ -38,7 +40,7 @@
     <Applications>
         <Application Id="Aiko" Executable="AikoPdf.exe" EntryPoint="Windows.FullTrustApplication">
             <uap:VisualElements
-                DisplayName="Aiko"
+                DisplayName="Aiko PDF"
                 Description="A simple PDF reader."
                 BackgroundColor="transparent"
                 Square150x150Logo="Assets\Square150x150Logo.png"

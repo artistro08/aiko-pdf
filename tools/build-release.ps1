@@ -1,21 +1,24 @@
 # Builds the shippable Aiko artifacts into dist\:
 #
-#   Aiko-<version>-x64.msix   the app
-#   Aiko.cer                  the certificate the MSIX is signed with, which a person installs into Trusted
-#                             People (double-click, Install Certificate, Local Machine, Trusted People) before
-#                             the package will install
+#   Aiko-<version>-x64.msix         the app, for a GitHub release
+#   Aiko.cer                        the certificate that MSIX is signed with, which a person installs into Trusted
+#                                   People (double-click, Install Certificate, Local Machine, Trusted People) before
+#                                   the package will install
+#   Aiko-<version>-x64-store.msix   with -Store: the same package unsigned, to upload to Partner Center, which
+#                                   signs it for the Microsoft Store itself
 #
-# Used to cut a GitHub release. The package is laid out by the MSIX tooling in the build itself, because a package
-# built by hand out of the unpackaged output cannot resolve the app's XAML under package identity. Signing uses
-# signtool from the Microsoft.Windows.SDK.BuildTools package the app already references, with a self-signed
-# certificate kept in the current user's store.
+# Used to cut a GitHub release, and with -Store a Microsoft Store submission. The package is laid out by the MSIX
+# tooling in the build itself, because a package built by hand out of the unpackaged output cannot resolve the
+# app's XAML under package identity. Signing uses signtool from the Microsoft.Windows.SDK.BuildTools package the
+# app already references, with a self-signed certificate kept in the current user's store.
 
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
     [string] $Version = '1.0.0',
     [string] $Configuration = 'Release',
-    [switch] $SkipTests
+    [switch] $SkipTests,
+    [switch] $Store
 )
 
 $ErrorActionPreference = 'Stop'
@@ -76,11 +79,20 @@ finally
 $built = Get-ChildItem $packages -Recurse -Filter '*.msix' | Select-Object -First 1
 if (-not $built) { throw 'no MSIX was produced' }
 
+# The Store signs what it is sent with its own certificate, so its package goes up exactly as built.
+if ($Store) {
+    $storePackage = Join-Path $dist "Aiko-$Version-x64-store.msix"
+    Copy-Item $built.FullName $storePackage -Force
+    Get-Item $storePackage | Select-Object Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table
+    return
+}
+
 $msix = Join-Path $dist "Aiko-$Version-x64.msix"
 Copy-Item $built.FullName $msix -Force
 
-# Signing. The certificate's subject has to match the manifest's Publisher exactly.
-$subject = 'CN=Devin Green'
+# Signing. The certificate's subject has to match the manifest's Publisher exactly, so it is read from there:
+# the Store reservation's publisher id, which a self-signed certificate can carry for sideloading too.
+$subject = ([xml]$manifestText).Package.Identity.Publisher
 $cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Subject -eq $subject -and $_.NotAfter -gt (Get-Date) } |
     Sort-Object NotAfter -Descending | Select-Object -First 1
 if (-not $cert) {
