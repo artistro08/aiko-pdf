@@ -7,7 +7,8 @@
 </h1>
 
 <p align="center">
-    A native WinUI 3 PDF reader for Windows.
+    A native WinUI 3 PDF reader for Windows.<br>
+    Aiko — 愛子 — Love, child, child of love.
 </p>
 
 ![Aiko PDF with a document open](docs/screenshot.png)
