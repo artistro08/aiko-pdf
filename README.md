@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-    A native WinUI 3 PDF reader for Windows. Open, read, select, copy.
+    A native WinUI 3 PDF reader for Windows.
 </p>
 
 ![Aiko with a document open](docs/screenshot.png)
