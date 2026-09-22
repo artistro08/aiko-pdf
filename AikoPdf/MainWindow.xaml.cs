@@ -34,8 +34,12 @@ public sealed partial class MainWindow : Window
     private bool          sized;
     private bool          printing;
 
-    /// <summary>Builds the window with a Mica backdrop and the WinUI title bar, then shows the home page.</summary>
-    public MainWindow()
+    /// <summary>
+    /// Builds the window with a Mica backdrop and the WinUI title bar, then shows the home page. Pass a file to
+    /// open it straight away instead: a document opened from Explorer should never flash the home page first.
+    /// </summary>
+    /// <param name="startupFile">A PDF to open as the window appears, or null for the home page.</param>
+    public MainWindow(string? startupFile = null)
     {
         InitializeComponent();
         SystemBackdrop             = new MicaBackdrop();
@@ -65,7 +69,27 @@ public sealed partial class MainWindow : Window
                 RestoreWindowSize();
             }
         };
-        ShowHome();
+        if (startupFile is null)
+        {
+            ShowHome();
+        }
+        else
+        {
+            // The frame stays empty until the document is ready, which is a moment of the window's own backdrop
+            // rather than a home page that was never asked for.
+            Title = System.IO.Path.GetFileName(startupFile);
+            Root.Loaded += async (_, _) =>
+            {
+                await OpenFileAsync(startupFile);
+
+                // A file that could not be opened (wrong password, damaged, gone) leaves an empty frame, so fall
+                // back to the page the app would have shown anyway.
+                if (RootFrame.Content is null)
+                {
+                    ShowHome();
+                }
+            };
+        }
     }
 
     /// <summary>

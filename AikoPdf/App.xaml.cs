@@ -96,7 +96,11 @@ public partial class App : Application
     /// <param name="args">Launch details (unused; the command line is read from the environment).</param>
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        Window = new MainWindow();
+        // Worked out before the window is built, so a document opened from Explorer goes straight into the
+        // viewer instead of flashing the home page on its way there.
+        string? startupFile = StartupFile();
+
+        Window = new MainWindow(startupFile);
         Window.Activate();
 
         // Keep Windows pointed at this executable so "Open with" and Default apps list it, wherever it lives.
@@ -121,10 +125,6 @@ public partial class App : Application
             }
         }
 
-        if (StartupFile() is { } startupFile)
-        {
-            _ = Window.OpenFileAsync(startupFile);
-        }
     }
 
     /// <summary>
