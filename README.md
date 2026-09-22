@@ -14,7 +14,7 @@
 
 
 I built this because I wanted a simple PDF viewer that looked good. There is a
-[sample document](docs/sample.pdf) in this repo if you want something to open.
+[sample document](docs/sample.pdf) to test the viewer if you want.
 
 ## Installing
 
