@@ -54,4 +54,19 @@
     <PackageReference Include="PdfPig" Version="0.1.16" />
   </ItemGroup>
 
+  <!-- Publish the compiled XAML with the app. dotnet publish leaves the app's own resources.pri and the .xbf
+       files behind, which the framework ones do not replace: without them the published folder starts and dies
+       with "Cannot locate resource from 'ms-appx:///MainWindow.xaml'". -->
+  <Target Name="PublishCompiledXaml" BeforeTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <_AikoXamlResource Include="$(OutputPath)$(AssemblyName).pri" Condition="Exists('$(OutputPath)$(AssemblyName).pri')" />
+      <_AikoXamlResource Include="$(OutputPath)resources.pri" Condition="Exists('$(OutputPath)resources.pri')" />
+      <_AikoXamlResource Include="$(OutputPath)**\*.xbf" />
+      <ResolvedFileToPublish Include="@(_AikoXamlResource)">
+        <RelativePath>%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
 </Project>

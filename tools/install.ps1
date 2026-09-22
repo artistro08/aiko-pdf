@@ -44,12 +44,24 @@ if (-not $trusted) {
 }
 
 Write-Host 'Installing Aiko...' -ForegroundColor Cyan
-if (Get-AppxPackage -Name 'Artistro08.Aiko') {
-    # Replacing a version already installed, and closing it if it happens to be running.
-    Add-AppxPackage -Path $Package -ForceApplicationShutdown -ForceUpdateFromAnyVersion
+$existing = Get-AppxPackage -Name 'Artistro08.Aiko'
+if (-not $existing) {
+    Add-AppxPackage -Path $Package
 }
 else {
-    Add-AppxPackage -Path $Package
+    try
+    {
+        # Replacing a version already installed, closing it first if it happens to be running.
+        Add-AppxPackage -Path $Package -ForceApplicationShutdown -ForceUpdateFromAnyVersion -ErrorAction Stop
+    }
+    catch
+    {
+        # Windows refuses to replace a package with different contents under the same version, which happens while
+        # testing a build. Take the old one out and put this one in; the app's settings live outside the package.
+        Write-Host 'Replacing the installed copy...' -ForegroundColor Cyan
+        Remove-AppxPackage -Package $existing.PackageFullName
+        Add-AppxPackage -Path $Package
+    }
 }
 
 $installed = Get-AppxPackage -Name 'Artistro08.Aiko'
