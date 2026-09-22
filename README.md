@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">
-    Aiko
+    Aiko PDF
 </h1>
 
 <p align="center">
