@@ -32,6 +32,7 @@ public sealed partial class MainWindow : Window
     private SubclassProc? activationHook;
     private bool          opening;
     private bool          sized;
+    private bool          opened;
     private bool          printing;
 
     /// <summary>
@@ -80,6 +81,13 @@ public sealed partial class MainWindow : Window
             Title = System.IO.Path.GetFileName(startupFile);
             Root.Loaded += async (_, _) =>
             {
+                // Loaded can fire again if the content is ever re-attached; the file is opened once.
+                if (opened)
+                {
+                    return;
+                }
+
+                opened = true;
                 await OpenFileAsync(startupFile);
 
                 // A file that could not be opened (wrong password, damaged, gone) leaves an empty frame, so fall
