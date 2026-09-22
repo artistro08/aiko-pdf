@@ -170,8 +170,8 @@
             <!-- Holds the faded copy of the list that the reader actually sees -->
             <Border x:Name="RecentFade" IsHitTestVisible="False" />
 
-            <!-- Heading: its own small island of Mica, the window's material, rounded like the panel, staying put over
-                 the list as it scrolls away beneath -->
+            <!-- Heading: sits over the list as it scrolls, on a rounded chip of Mica tinted to match the panel so the
+                 word stays readable over the cards passing underneath -->
             <Grid
                 x:Name="RecentHeader"
                 Margin="12,12,12,0"
@@ -183,6 +183,10 @@
                         <MicaBackdrop />
                     </SystemBackdropElement.SystemBackdrop>
                 </SystemBackdropElement>
+
+                <!-- The panel's own tint over the Mica, so the chip is exactly the panel's color and only hides the
+                     cards passing behind the word -->
+                <Border CornerRadius="6" Background="{StaticResource IslandFillBrush}" />
                 <TextBlock
                     Text="Recent"
                     Margin="12,4,12,6"

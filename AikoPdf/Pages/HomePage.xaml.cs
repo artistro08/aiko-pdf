@@ -28,8 +28,9 @@ public sealed partial class HomePage : Page
             Refresh();
             SizeRecentPanel(ActualWidth);
 
-            // Clear under the heading, fading in just below it, so a card scrolling up is gone before it gets there.
-            fade ??= ScrollFade.Attach(RecentSection, RecentSection, RecentFade, topLength: 24, bottomLength: 32, topHold: 50);
+            // Cards scroll up under the heading, which stays readable on its own Mica background, and fade out at the
+            // panel's top edge.
+            fade ??= ScrollFade.Attach(RecentSection, RecentSection, RecentFade, topLength: 24, bottomLength: 32);
         };
         Unloaded += (_, _) => App.Recent.Changed -= Refresh;
     }
