@@ -148,7 +148,74 @@ public sealed class PdfTextLayerTests : IDisposable
         Assert.Equal(2, panels.Count);
         Assert.All(panels, panel => Assert.Equal(200, panel.Width, 1));
         Assert.All(panels, panel => Assert.Equal(300, panel.Height, 1));
-        Assert.Empty(PdfTextLayer.ExtractContainers(UglyToad.PdfPig.PdfDocument.Open(Temp(SamplePdf.Blank())).GetPage(1)));
+
+        // Top-left corners in rendered space: the left panel is 50 in and 792 - 700 = 92 down.
+        Assert.Contains(panels, panel => (Math.Abs(panel.Left - 50) < 1) && (Math.Abs(panel.Top - 92) < 1));
+        Assert.Contains(panels, panel => (Math.Abs(panel.Left - 300) < 1) && (Math.Abs(panel.Top - 92) < 1));
+
+        using PdfTextLayer blank = PdfTextLayer.Open(Temp(SamplePdf.Blank()));
+        Assert.Empty(blank.GetContainers(1));
+    }
+
+    [Fact]
+    public void Containers_InsideAFormArePlacedThroughItsTransform()
+    {
+        using PdfTextLayer layer = PdfTextLayer.Open(Temp(SamplePdf.TwoPanelsInAForm()));
+        IReadOnlyList<Rect> panels = layer.GetContainers(1);
+
+        // The form is drawn 10 right and 20 up, so the left panel lands at x 60 and 792 - 720 = 72 down.
+        Assert.Equal(2, panels.Count);
+        Assert.Contains(panels, panel => (Math.Abs(panel.Left - 60) < 1) && (Math.Abs(panel.Top - 72) < 1));
+        Assert.Contains(panels, panel => (Math.Abs(panel.Left - 310) < 1) && (Math.Abs(panel.Top - 72) < 1));
+    }
+
+    [Theory]
+    [InlineData("RC4")]
+    [InlineData("AES256")]
+    public void Encrypted_NeedsThePassword(string algorithm)
+    {
+        string path = SamplePdf.Encrypted(algorithm);
+
+        Assert.Throws<PdfPasswordException>(() => PdfTextLayer.Open(path));
+        Assert.Throws<PdfPasswordException>(() => PdfTextLayer.Open(path, "not the password"));
+    }
+
+    [Theory]
+    [InlineData("RC4")]
+    [InlineData("AES256")]
+    public void Encrypted_OpensWithThePassword(string algorithm)
+    {
+        using PdfTextLayer layer = PdfTextLayer.Open(SamplePdf.Encrypted(algorithm), SamplePdf.FixturePassword);
+        var selection = new TextSelection(layer.GetGlyphs(1));
+        selection.SelectAll();
+
+        Assert.Equal($"Hello World{Environment.NewLine}Second line here", selection.Text);
+    }
+
+    [Fact]
+    public void Dispose_TwiceIsHarmless_AndUseAfterwardThrows()
+    {
+        PdfTextLayer layer = PdfTextLayer.Open(Temp(SamplePdf.TwoLines()));
+        layer.Dispose();
+        layer.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => layer.GetGlyphs(1));
+    }
+
+    [Fact]
+    public void ManyThreads_ReadingAtOnce_AgreeWithOneThread()
+    {
+        using PdfTextLayer first  = PdfTextLayer.Open(Temp(SamplePdf.ThreePages()));
+        using PdfTextLayer second = PdfTextLayer.Open(Temp(SamplePdf.TwoLines()));
+
+        // PDFium is not thread-safe on its own; the shared lock is what makes this pass instead of crash.
+        Parallel.For(0, 64, i =>
+        {
+            PdfTextLayer layer = (i % 2 == 0) ? first : second;
+            int          page  = (i % 2 == 0) ? (i % 3) + 1 : 1;
+            Assert.NotEmpty(layer.GetGlyphs(page));
+            Assert.NotEqual(default, layer.GetPageSize(page));
+        });
     }
 
     [Fact]

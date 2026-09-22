@@ -50,8 +50,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.4.0" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.6584" />
-    <!-- Text geometry for selection. Windows.Data.Pdf renders pages but exposes no text, so this pure C# parser fills the gap. -->
-    <PackageReference Include="PdfPig" Version="0.1.16" />
+    <!-- Text geometry for selection. Windows.Data.Pdf renders pages but exposes no text, so PDFium, the engine
+         inside Chrome, reads each character's position. This package ships only the native library; the calls
+         are declared in Pdf/Pdfium.cs. -->
+    <PackageReference Include="bblanchon.PDFium.Win32" Version="156.0.8066" />
   </ItemGroup>
 
   <!-- Publish the compiled XAML with the app. dotnet publish leaves the app's own resources.pri and the .xbf

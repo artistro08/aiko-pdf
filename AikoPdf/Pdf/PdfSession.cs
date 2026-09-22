@@ -1,13 +1,12 @@
-using UglyToad.PdfPig.Exceptions;
 using Windows.Foundation;
 
 namespace AikoPdf.Pdf;
 
 /// <summary>
-/// One open document: the Windows renderer that draws its pages and the PdfPig text layer that makes them
+/// One open document: the Windows renderer that draws its pages and the PDFium text layer that makes them
 /// selectable, opened together from the same file and closed together.
 ///
-/// The text layer is optional. If PdfPig can't parse a file that Windows can still draw, the document opens
+/// The text layer is optional. If PDFium can't parse a file that Windows can still draw, the document opens
 /// read-only with no text selection rather than not at all.
 /// </summary>
 /// <remarks>
@@ -49,27 +48,26 @@ public sealed class PdfSession : IDisposable
     /// <param name="path">Full path of the file.</param>
     /// <param name="password">The password for an encrypted file, or null to try without one.</param>
     /// <returns>The open session.</returns>
-    /// <exception cref="PdfDocumentEncryptedException">The file needs a password, or the one given is wrong.</exception>
+    /// <exception cref="PdfPasswordException">The file needs a password, or the one given is wrong.</exception>
     /// <exception cref="IOException">The file can't be read.</exception>
     /// <exception cref="NotSupportedException">The password worked but Windows can't open this kind of encryption.</exception>
     /// <exception cref="Exception">Windows can't open the file as a PDF (COM error from the PDF engine).</exception>
     public static async Task<PdfSession> OpenAsync(string path, string? password = null)
     {
-        // PdfPig goes first because it tells "needs a password" apart from "not a PDF".
+        // PDFium goes first because it tells "needs a password" apart from "not a PDF".
         PdfTextLayer? textLayer = null;
         try
         {
             textLayer = await Task.Run(() => PdfTextLayer.Open(path, password));
         }
-        catch (PdfDocumentEncryptedException)
+        catch (PdfPasswordException)
         {
             throw;
         }
         catch (Exception ex) when (ExceptionFilters.IsRecoverable(ex))
         {
             // Windows may still render it; the document just won't have selectable text. That includes a file
-            // another process holds open for writing: PdfPig asks for shared read only, the renderer asks for
-            // read and write, so the document still opens.
+            // another process holds open for writing: both engines ask for shared read and write access.
         }
 
         try
@@ -79,7 +77,7 @@ public sealed class PdfSession : IDisposable
         }
         catch (Exception ex) when ((textLayer is not null) && (password is not null) && ExceptionFilters.IsRecoverable(ex))
         {
-            // The password was right, because PdfPig read the file with it, and Windows still refused: its PDF
+            // The password was right, because PDFium read the file with it, and Windows still refused: its PDF
             // engine handles the older encryption but not AES-256, the one PDF 2.0 tools write. Saying the file
             // may be damaged would send the reader looking for a problem that isn't there.
             textLayer.Dispose();

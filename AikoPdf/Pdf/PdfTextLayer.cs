@@ -1,8 +1,4 @@
-using UglyToad.PdfPig;
-using UglyToad.PdfPig.Content;
-using UglyToad.PdfPig.Core;
-using UglyToad.PdfPig.Graphics;
-using UglyToad.PdfPig.Outline;
+using System.Runtime.InteropServices;
 using Windows.Foundation;
 
 namespace AikoPdf.Pdf;
@@ -11,48 +7,48 @@ namespace AikoPdf.Pdf;
 /// The text behind a rendered page: every visible character with its position, in reading order, so the viewer
 /// can select and copy text from what is otherwise a bitmap.
 ///
-/// Windows renders the pages but exposes no text, so this parses the same file with PdfPig. Glyph lists are built
-/// on first use per page and cached for the life of the document. PdfPig documents are not thread-safe, so all
-/// access is serialized behind one lock.
+/// Windows renders the pages but exposes no text, so this opens the same file with PDFium, the engine inside
+/// Chrome, which reads each character's box, the outline that names pages, and the rectangles drawn behind cards
+/// and columns. Glyph lists are built on first use per page and cached for the life of the document. PDFium is not
+/// safe to call from two threads at once, so every call goes through one lock shared by all documents.
 /// </summary>
 /// <remarks>
 /// @author Devin Green (Artistro08)
-/// @link https://github.com/UglyToad/PdfPig
+/// @link https://pdfium.googlesource.com/pdfium/+/refs/heads/main/public/fpdf_text.h
 /// </remarks>
 public sealed class PdfTextLayer : IDisposable
 {
-    private readonly PdfDocument                              document;
-    private readonly Lock                                     gate  = new();
+    // Page-to-screen mapping in PDFium hands back whole numbers, so pages are mapped at this many units per point
+    // and divided back down: positions stay accurate to a hundredth of a point.
+    private const int Precision = 100;
+
+    private readonly nint                                      document;
     private readonly Dictionary<int, IReadOnlyList<TextGlyph>> cache      = [];
     private readonly Dictionary<int, IReadOnlyList<Rect>>      containers = [];
     private readonly Dictionary<int, string>                   pageNames  = [];
 
-    private PdfTextLayer(PdfDocument document)
+    // The file's bytes, held in unmanaged memory for as long as the document is open: PDFium reads from them as
+    // it needs them instead of taking its own copy.
+    private nint data;
+
+    private PdfTextLayer(nint document, nint data)
     {
         this.document = document;
-
-        // The outline (bookmarks) is the closest thing a PDF has to page names: the first entry that points at a
-        // page names that page.
-        if (document.TryGetBookmarks(out Bookmarks? bookmarks))
-        {
-            foreach (DocumentBookmarkNode node in bookmarks.GetNodes().OfType<DocumentBookmarkNode>())
-            {
-                if (!string.IsNullOrWhiteSpace(node.Title))
-                {
-                    pageNames.TryAdd(node.PageNumber, node.Title.Trim());
-                }
-            }
-        }
+        this.data     = data;
+        PageCount     = Pdfium.FPDF_GetPageCount(document);
+        ReadOutline(Pdfium.FPDFBookmark_GetFirstChild(document, nint.Zero), depth: 0);
     }
 
     /// <summary>Number of pages in the document.</summary>
-    public int PageCount => document.NumberOfPages;
+    public int PageCount { get; }
 
     /// <summary>Opens a PDF for text extraction.</summary>
     /// <param name="path">Full path of the file.</param>
     /// <param name="password">The user password for an encrypted file, or null.</param>
     /// <returns>The open text layer.</returns>
-    /// <exception cref="UglyToad.PdfPig.Exceptions.PdfDocumentEncryptedException">The file needs a password, or the one given is wrong.</exception>
+    /// <exception cref="FileNotFoundException">The file does not exist.</exception>
+    /// <exception cref="PdfPasswordException">The file needs a password, or the one given is wrong.</exception>
+    /// <exception cref="InvalidDataException">The file isn't a PDF PDFium can read.</exception>
     public static PdfTextLayer Open(string path, string? password = null)
     {
         if (!File.Exists(path))
@@ -60,17 +56,36 @@ public sealed class PdfTextLayer : IDisposable
             throw new FileNotFoundException("The PDF file was not found.", path);
         }
 
-        var options = new ParsingOptions
+        // Shared for reading and writing, so a file another app still holds open (a sync client, the tool that
+        // just wrote it) opens anyway.
+        byte[] bytes;
+        using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
         {
-            UseLenientParsing = true,
-            SkipMissingFonts  = true,
-        };
-        if (password is not null)
-        {
-            options.Password = password;
+            bytes = new byte[file.Length];
+            file.ReadExactly(bytes);
         }
 
-        return new PdfTextLayer(PdfDocument.Open(path, options));
+        nint data = Marshal.AllocHGlobal(Math.Max(1, bytes.Length));
+        Marshal.Copy(bytes, 0, data, bytes.Length);
+
+        lock (Pdfium.Gate)
+        {
+            nint document = Pdfium.FPDF_LoadMemDocument64(data, (nuint)bytes.Length, password);
+            if (document != nint.Zero)
+            {
+                return new PdfTextLayer(document, data);
+            }
+
+            uint error = Pdfium.FPDF_GetLastError();
+            Marshal.FreeHGlobal(data);
+            throw error switch
+            {
+                Pdfium.ErrorPassword => new PdfPasswordException(),
+                Pdfium.ErrorFile     => new IOException($"PDFium could not read {path}."),
+                Pdfium.ErrorSecurity => new InvalidDataException("The PDF uses a security handler PDFium doesn't support."),
+                _                    => new InvalidDataException($"PDFium could not open the file (error {error})."),
+            };
+        }
     }
 
     /// <summary>The name the document's outline gives a page, or null when no bookmark points at it.</summary>
@@ -84,14 +99,14 @@ public sealed class PdfTextLayer : IDisposable
     /// <returns>The page's glyphs; empty for a page with no text (a scan, for example).</returns>
     public IReadOnlyList<TextGlyph> GetGlyphs(int pageNumber)
     {
-        lock (gate)
+        lock (Pdfium.Gate)
         {
             if (cache.TryGetValue(pageNumber, out IReadOnlyList<TextGlyph>? cached))
             {
                 return cached;
             }
 
-            IReadOnlyList<TextGlyph> glyphs = Extract(document.GetPage(pageNumber));
+            IReadOnlyList<TextGlyph> glyphs = WithPage(pageNumber, page => BuildGlyphs(ReadLetters(page)));
             cache[pageNumber] = glyphs;
             return glyphs;
         }
@@ -103,58 +118,31 @@ public sealed class PdfTextLayer : IDisposable
     /// to call from any thread.
     /// </summary>
     /// <param name="pageNumber">1-based page number.</param>
-    /// <returns>Rectangles in rendered page coordinates; empty for a page without drawn panels.</returns>
+    /// <returns>Rectangles in rendered page coordinates, largest first; empty for a page without drawn panels.</returns>
     public IReadOnlyList<Rect> GetContainers(int pageNumber)
     {
-        lock (gate)
+        lock (Pdfium.Gate)
         {
             if (containers.TryGetValue(pageNumber, out IReadOnlyList<Rect>? cached))
             {
                 return cached;
             }
 
-            IReadOnlyList<Rect> rects = ExtractContainers(document.GetPage(pageNumber));
+            IReadOnlyList<Rect> rects = WithPage(pageNumber, page =>
+            {
+                var found = new List<Rect>();
+                int count = Pdfium.FPDFPage_CountObjects(page);
+                for (int i = 0; i < count; i++)
+                {
+                    CollectFilledPaths(page, Pdfium.FPDFPage_GetObject(page, i), Pdfium.Matrix.Identity, found, depth: 0);
+                }
+
+                return FilterContainers(found, SizeOf(page));
+            });
+
             containers[pageNumber] = rects;
             return rects;
         }
-    }
-
-    /// <summary>Finds the filled rectangular paths on a page that could hold a block of text.</summary>
-    /// <param name="page">A PdfPig page.</param>
-    /// <returns>Rectangles in rendered page coordinates, largest first.</returns>
-    public static IReadOnlyList<Rect> ExtractContainers(Page page)
-    {
-        PageGeometry geometry = GeometryOf(page);
-        double       pageArea = geometry.RenderedSize.Width * geometry.RenderedSize.Height;
-        var          rects    = new List<Rect>();
-
-        foreach (PdfPath path in page.Paths)
-        {
-            if (!path.IsFilled || path.IsClipping || (path.GetBoundingRectangle() is not { } box))
-            {
-                continue;
-            }
-
-            Rect rect = geometry.ToRendered(box.Left, box.Bottom, box.Right, box.Top);
-
-            // Panels only: not hairlines or bullets, not the page background itself.
-            if ((rect.Width < 24) || (rect.Height < 24) || ((rect.Width * rect.Height) > (0.9 * pageArea)))
-            {
-                continue;
-            }
-
-            // A card's background is often painted several times (shadow, fill, border); keep one of each.
-            bool duplicate = rects.Exists(existing => (Math.Abs(existing.Left - rect.Left) < 1)
-                && (Math.Abs(existing.Top - rect.Top) < 1) && (Math.Abs(existing.Width - rect.Width) < 1)
-                && (Math.Abs(existing.Height - rect.Height) < 1));
-            if (!duplicate)
-            {
-                rects.Add(rect);
-            }
-        }
-
-        rects.Sort((a, b) => (b.Width * b.Height).CompareTo(a.Width * a.Height));
-        return rects;
     }
 
     /// <summary>The rendered size of a page in points, rotation applied.</summary>
@@ -162,43 +150,61 @@ public sealed class PdfTextLayer : IDisposable
     /// <returns>Width and height in points.</returns>
     public Size GetPageSize(int pageNumber)
     {
-        lock (gate)
+        lock (Pdfium.Gate)
         {
-            return GeometryOf(document.GetPage(pageNumber)).RenderedSize;
+            return WithPage(pageNumber, SizeOf);
         }
     }
 
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        lock (Pdfium.Gate)
+        {
+            if (data == nint.Zero)
+            {
+                return;
+            }
+
+            Pdfium.FPDF_CloseDocument(document);
+            Marshal.FreeHGlobal(data);
+            data = nint.Zero;
+        }
+    }
+
+    // =========================================================================
+    // GLYPH LAYOUT
+    // =========================================================================
+
     /// <summary>
-    /// Builds the glyph list for one parsed page in the order the file draws its text. That is the order every
+    /// Builds the glyph list for a page from its letters in the order the file draws them. That is the order every
     /// browser's PDF viewer selects in, and in a laid-out document it keeps each box or column together: a drag
     /// inside one card selects that card, not the neighbor's rows in between. Words are cut at spaces and at
     /// jumps in position; lines are cut where the next word is on another row or far away.
     /// </summary>
-    /// <param name="page">A PdfPig page.</param>
-    /// <returns>Glyphs in rendered page coordinates.</returns>
-    public static IReadOnlyList<TextGlyph> Extract(Page page)
+    /// <param name="letters">
+    /// The page's characters in drawing order, each with its box in rendered page coordinates. Whitespace entries
+    /// only mark word boundaries; their boxes are ignored.
+    /// </param>
+    /// <returns>Glyphs in rendered page coordinates, numbered by word and line.</returns>
+    public static IReadOnlyList<TextGlyph> BuildGlyphs(IReadOnlyList<(string Text, Rect Bounds)> letters)
     {
         // How far apart (in letter heights) two letters can be and still share a word, and (in line heights) two
         // words on the same row can be and still share a line.
-        const double MaxLetterGapInHeights = 0.35;
+        const double MaxLetterGapInHeights   = 0.35;
         const double MaxWordGapInLineHeights = 2.5;
 
-        PageGeometry geometry = GeometryOf(page);
-
-        // Letters as drawn, mapped into rendered space. Whitespace letters only mark word boundaries.
-        var  words   = new List<MappedWord>();
-        var  current = new List<(string Text, Rect Bounds)>();
+        var  words      = new List<MappedWord>();
+        var  current    = new List<(string Text, Rect Bounds)>();
         Rect wordBounds = Rect.Empty;
-        foreach (Letter letter in page.Letters)
+        foreach ((string text, Rect glyph) in letters)
         {
-            if (string.IsNullOrWhiteSpace(letter.Value))
+            if (string.IsNullOrWhiteSpace(text))
             {
                 FlushWord(words, current);
                 continue;
             }
 
-            PdfRectangle box   = letter.BoundingBox;
-            Rect         glyph = geometry.ToRendered(box.Left, box.Bottom, box.Right, box.Top);
             if ((glyph.Width <= 0) || (glyph.Height <= 0))
             {
                 continue;
@@ -217,7 +223,7 @@ public sealed class PdfTextLayer : IDisposable
                 }
             }
 
-            current.Add((letter.Value, glyph));
+            current.Add((text, glyph));
             wordBounds = (current.Count == 1) ? glyph : Union(wordBounds, glyph);
         }
 
@@ -264,6 +270,37 @@ public sealed class PdfTextLayer : IDisposable
     }
 
     /// <summary>
+    /// Keeps the rectangles that could hold a block of text: not hairlines or bullets, not the page background, and
+    /// only one of each where a card is painted several times over (shadow, fill, border).
+    /// </summary>
+    /// <param name="rects">Filled shapes' bounds in rendered page coordinates.</param>
+    /// <param name="page">The page's rendered size in points.</param>
+    /// <returns>The panels, largest first.</returns>
+    public static IReadOnlyList<Rect> FilterContainers(IEnumerable<Rect> rects, Size page)
+    {
+        double pageArea = page.Width * page.Height;
+        var    kept     = new List<Rect>();
+        foreach (Rect rect in rects)
+        {
+            if ((rect.Width < 24) || (rect.Height < 24) || ((rect.Width * rect.Height) > (0.9 * pageArea)))
+            {
+                continue;
+            }
+
+            bool duplicate = kept.Exists(existing => (Math.Abs(existing.Left - rect.Left) < 1)
+                && (Math.Abs(existing.Top - rect.Top) < 1) && (Math.Abs(existing.Width - rect.Width) < 1)
+                && (Math.Abs(existing.Height - rect.Height) < 1));
+            if (!duplicate)
+            {
+                kept.Add(rect);
+            }
+        }
+
+        kept.Sort((a, b) => (b.Width * b.Height).CompareTo(a.Width * a.Height));
+        return kept;
+    }
+
+    /// <summary>
     /// True when two boxes sit on the same row of text. A box at least 60% the height of the other must overlap
     /// it by half its height; a shorter box (a comma, an apostrophe) only has to touch the row, since it hangs
     /// below the baseline or floats above the x-height.
@@ -299,22 +336,181 @@ public sealed class PdfTextLayer : IDisposable
         letters.Clear();
     }
 
-    /// <inheritdoc/>
-    public void Dispose()
+    // =========================================================================
+    // READING FROM PDFIUM (CALLERS HOLD Pdfium.Gate)
+    // =========================================================================
+
+    /// <summary>Loads a page, runs something against it, and closes it again.</summary>
+    private T WithPage<T>(int pageNumber, Func<nint, T> read)
     {
-        lock (gate)
+        ObjectDisposedException.ThrowIf(data == nint.Zero, this);
+
+        nint page = Pdfium.FPDF_LoadPage(document, pageNumber - 1);
+        if (page == nint.Zero)
         {
-            document.Dispose();
+            throw new ArgumentOutOfRangeException(nameof(pageNumber), pageNumber, "The page could not be loaded.");
+        }
+
+        try
+        {
+            return read(page);
+        }
+        finally
+        {
+            Pdfium.FPDF_ClosePage(page);
         }
     }
 
-    private static PageGeometry GeometryOf(Page page)
+    private static Size SizeOf(nint page)
+        => new(Pdfium.FPDF_GetPageWidthF(page), Pdfium.FPDF_GetPageHeightF(page));
+
+    /// <summary>
+    /// Maps a box from PDF page space (points, origin bottom-left, before the page's rotation) to rendered page
+    /// coordinates (points, origin top-left, crop box and rotation applied), the space Windows draws the page in.
+    /// </summary>
+    private static Rect ToRendered(nint page, Size size, double left, double bottom, double right, double top)
     {
-        // PdfPig already reports letters, paths and Width/Height inside the crop box, rotation applied, so the
-        // page starts at the origin whatever its /CropBox and /Rotate say. Subtracting the crop origin again put
-        // every glyph on a trimmed page (a crop box not at 0,0) out by that offset, and Windows renders the crop
-        // box too, so the highlights missed the text they belonged to.
-        return new PageGeometry(0, 0, page.Width, page.Height);
+        int width  = (int)Math.Round(size.Width * Precision);
+        int height = (int)Math.Round(size.Height * Precision);
+        Pdfium.FPDF_PageToDevice(page, 0, 0, width, height, 0, left, bottom, out int x1, out int y1);
+        Pdfium.FPDF_PageToDevice(page, 0, 0, width, height, 0, right, top, out int x2, out int y2);
+
+        double x = Math.Min(x1, x2) / (double)Precision;
+        double y = Math.Min(y1, y2) / (double)Precision;
+        return new Rect(x, y, Math.Abs(x2 - x1) / (double)Precision, Math.Abs(y2 - y1) / (double)Precision);
+    }
+
+    /// <summary>
+    /// Reads a page's characters in drawing order with their boxes. Spaces and line breaks PDFium adds between
+    /// runs come through as whitespace, which only marks a word boundary; a character outside the Basic
+    /// Multilingual Plane arrives as two halves and is joined back into one glyph.
+    /// </summary>
+    private static List<(string Text, Rect Bounds)> ReadLetters(nint page)
+    {
+        var  letters  = new List<(string Text, Rect Bounds)>();
+        nint textPage = Pdfium.FPDFText_LoadPage(page);
+        if (textPage == nint.Zero)
+        {
+            return letters;
+        }
+
+        try
+        {
+            Size size  = SizeOf(page);
+            int  count = Pdfium.FPDFText_CountChars(textPage);
+            for (int i = 0; i < count; i++)
+            {
+                uint code = Pdfium.FPDFText_GetUnicode(textPage, i);
+                if ((code < 0x20) || (code == 0xFFFE) || (code == 0xFFFF) || ((code <= 0xFFFF) && char.IsWhiteSpace((char)code)))
+                {
+                    letters.Add((" ", Rect.Empty));
+                    continue;
+                }
+
+                if (!Pdfium.FPDFText_GetCharBox(textPage, i, out double left, out double right, out double bottom, out double top))
+                {
+                    continue;
+                }
+
+                string text;
+                if (code > 0xFFFF)
+                {
+                    text = (code <= 0x10FFFF) ? char.ConvertFromUtf32((int)code) : "�";
+                }
+                else if (char.IsHighSurrogate((char)code) && (i + 1 < count)
+                    && char.IsLowSurrogate((char)Pdfium.FPDFText_GetUnicode(textPage, i + 1)))
+                {
+                    text = new string([(char)code, (char)Pdfium.FPDFText_GetUnicode(textPage, i + 1)]);
+                    i++;
+                }
+                else
+                {
+                    text = ((char)code).ToString();
+                }
+
+                letters.Add((text, ToRendered(page, size, left, bottom, right, top)));
+            }
+        }
+        finally
+        {
+            Pdfium.FPDFText_ClosePage(textPage);
+        }
+
+        return letters;
+    }
+
+    /// <summary>
+    /// Adds the bounds of every filled path on a page, looking inside form XObjects too, whose contents are
+    /// placed on the page through their own transform.
+    /// </summary>
+    private static void CollectFilledPaths(nint page, nint pageObject, Pdfium.Matrix toPage, List<Rect> found, int depth)
+    {
+        // Forms can nest; a malformed file could nest them without end.
+        const int MaxDepth = 16;
+        if ((pageObject == nint.Zero) || (depth > MaxDepth))
+        {
+            return;
+        }
+
+        int type = Pdfium.FPDFPageObj_GetType(pageObject);
+        if (type == Pdfium.ObjectForm)
+        {
+            Pdfium.Matrix inner = Pdfium.FPDFPageObj_GetMatrix(pageObject, out Pdfium.Matrix form)
+                ? toPage.After(form)
+                : toPage;
+            int children = Pdfium.FPDFFormObj_CountObjects(pageObject);
+            for (int i = 0; i < children; i++)
+            {
+                CollectFilledPaths(page, Pdfium.FPDFFormObj_GetObject(pageObject, (uint)i), inner, found, depth + 1);
+            }
+
+            return;
+        }
+
+        if ((type != Pdfium.ObjectPath)
+            || !Pdfium.FPDFPath_GetDrawMode(pageObject, out int fill, out bool _)
+            || (fill == Pdfium.FillNone)
+            || !Pdfium.FPDFPageObj_GetBounds(pageObject, out float left, out float bottom, out float right, out float top))
+        {
+            return;
+        }
+
+        // Top-level bounds are already in page space; inside a form they are in the form's own space.
+        (double x1, double y1) = toPage.Apply(left, bottom);
+        (double x2, double y2) = toPage.Apply(right, top);
+        found.Add(ToRendered(page, SizeOf(page), Math.Min(x1, x2), Math.Min(y1, y2), Math.Max(x1, x2), Math.Max(y1, y2)));
+    }
+
+    /// <summary>
+    /// Walks the outline depth first. The first entry that points at a page names that page; later ones pointing
+    /// at the same page don't replace it.
+    /// </summary>
+    private void ReadOutline(nint bookmark, int depth)
+    {
+        // Outlines can be deep and, when damaged, circular; this caps the walk either way.
+        const int MaxDepth   = 32;
+        const int MaxEntries = 10_000;
+
+        int visited = 0;
+        while ((bookmark != nint.Zero) && (depth <= MaxDepth) && (visited++ < MaxEntries))
+        {
+            string title = Pdfium.BookmarkTitle(bookmark).Trim();
+            nint   dest  = Pdfium.FPDFBookmark_GetDest(document, bookmark);
+            if (dest == nint.Zero)
+            {
+                nint action = Pdfium.FPDFBookmark_GetAction(bookmark);
+                dest = (action == nint.Zero) ? nint.Zero : Pdfium.FPDFAction_GetDest(document, action);
+            }
+
+            int index = (dest == nint.Zero) ? -1 : Pdfium.FPDFDest_GetDestPageIndex(document, dest);
+            if ((index >= 0) && (title.Length > 0))
+            {
+                pageNames.TryAdd(index + 1, title);
+            }
+
+            ReadOutline(Pdfium.FPDFBookmark_GetFirstChild(document, bookmark), depth + 1);
+            bookmark = Pdfium.FPDFBookmark_GetNextSibling(document, bookmark);
+        }
     }
 
     /// <summary>A word in rendered space with its visible letters, sorted left to right.</summary>

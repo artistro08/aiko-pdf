@@ -7,7 +7,6 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Windowing;
-using UglyToad.PdfPig.Exceptions;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using Windows.Storage.Pickers;
@@ -472,7 +471,7 @@ public sealed partial class MainWindow : Window
             {
                 return await PdfSession.OpenAsync(path, password);
             }
-            catch (PdfDocumentEncryptedException)
+            catch (PdfPasswordException)
             {
                 password = await AskPasswordAsync(name, wrongPassword: password is not null);
                 if (password is null)
