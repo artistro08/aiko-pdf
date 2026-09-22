@@ -209,8 +209,10 @@ public sealed class TextSelection
     }
 
     /// <summary>
-    /// Selects the paragraph under a point, the way a triple-click does: the run of lines that belong together,
-    /// which in a laid-out document is also the card or column the point is in.
+    /// Selects the paragraph under a point, the way a triple-click does. A paragraph is narrower than the block
+    /// hit testing uses: within the block, it runs over lines set at ordinary line spacing, in the same size of
+    /// text, where every line but the last reaches the block's right edge. A blank line's worth of space, a change
+    /// of size or a line that stops short (a heading, the end of a paragraph) closes it.
     /// </summary>
     /// <param name="point">The click position in rendered page coordinates.</param>
     public void SelectParagraph(Point point)
@@ -223,16 +225,65 @@ public sealed class TextSelection
 
         foreach (Block block in blocks)
         {
-            int first = lines[block.FirstLine].First;
-            int last  = lines[block.LastLine].Last;
-            if ((hit >= first) && (hit <= last))
+            if ((hit < lines[block.FirstLine].First) || (hit > lines[block.LastLine].Last))
             {
-                anchorPoint = null;
-                anchor      = first;
-                focus       = last;
-                return;
+                continue;
             }
+
+            double right = 0;
+            int    line  = block.FirstLine;
+            for (int i = block.FirstLine; i <= block.LastLine; i++)
+            {
+                right = Math.Max(right, lines[i].Right);
+                if ((hit >= lines[i].First) && (hit <= lines[i].Last))
+                {
+                    line = i;
+                }
+            }
+
+            int top    = line;
+            int bottom = line;
+            while ((top > block.FirstLine) && SameParagraph(lines[top - 1], lines[top], right))
+            {
+                top--;
+            }
+
+            while ((bottom < block.LastLine) && SameParagraph(lines[bottom], lines[bottom + 1], right))
+            {
+                bottom++;
+            }
+
+            anchorPoint = null;
+            anchor      = lines[top].First;
+            focus       = lines[bottom].Last;
+            return;
         }
+    }
+
+    /// <summary>True when a line runs on into the one below it as part of the same paragraph.</summary>
+    /// <param name="upper">The line above.</param>
+    /// <param name="lower">The line below.</param>
+    /// <param name="right">The right edge of the block the lines sit in.</param>
+    /// <returns>True when both lines belong to one paragraph.</returns>
+    private static bool SameParagraph(LineBand upper, LineBand lower, double right)
+    {
+        // Measured on real documents: body text sits a quarter of a line height apart, airy card text about 0.8,
+        // and a blank line between paragraphs leaves 1.5 or more.
+        const double MaxGapInHeights = 1.2;
+
+        // A line that wraps ends near the right edge, give or take a ragged word; one that stops this far short
+        // ended its paragraph (a heading, a title, the last line).
+        const double MaxShortfallInHeights = 4;
+
+        double upperHeight = upper.Bottom - upper.Top;
+        double lowerHeight = lower.Bottom - lower.Top;
+        double height      = Math.Max(upperHeight, lowerHeight);
+        double gap         = lower.Top - upper.Bottom;
+
+        bool sameSize  = (height > 0) && ((Math.Min(upperHeight, lowerHeight) / height) >= 0.75);
+        bool close     = (gap >= -(0.5 * height)) && (gap <= (MaxGapInHeights * height));
+        bool runsOn    = upper.Right >= right - (MaxShortfallInHeights * height);
+        return sameSize && close && runsOn;
     }
 
     /// <summary>Removes the selection.</summary>

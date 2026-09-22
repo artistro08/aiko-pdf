@@ -273,16 +273,82 @@ public class TextSelectionTests
     }
 
     [Fact]
-    public void SelectParagraph_TakesTheCardUnderThePointAndNoOther()
+    public void SelectParagraph_TakesACardsWholeBody_WhenItsLinesAreSetLoosely()
+    {
+        // Card text measured on a design document: 7.8 high, 6.5 apart, ragged right by up to 22 points. The
+        // title above stops short, so it isn't part of the body.
+        TextGlyph[] glyphs =
+        [
+            new("T", new Rect(0, 0, 100, 7.8), 0, 0),
+            new("a", new Rect(0, 16.4, 190, 7.8), 1, 1),
+            new("b", new Rect(0, 30.7, 212, 7.8), 2, 2),
+            new("c", new Rect(0, 45.0, 171, 7.8), 3, 3),
+        ];
+        var selection = new TextSelection(glyphs);
+
+        selection.SelectParagraph(new Point(50, 20));
+        Assert.Equal($"a{Environment.NewLine}b{Environment.NewLine}c", selection.Text);
+
+        selection.SelectParagraph(new Point(50, 4));
+        Assert.Equal("T", selection.Text);
+    }
+
+    [Fact]
+    public void SelectParagraph_StaysInsideTheCardUnderThePoint()
     {
         var selection = new TextSelection(TwoCards, TwoCardPanels);
 
+        // Card A's rows, and nothing from card B or card A's much smaller label.
         selection.SelectParagraph(new Point(12, 26));
-        Assert.Equal($"a{Environment.NewLine}TA{Environment.NewLine}r1x{Environment.NewLine}r2", selection.Text);
+        Assert.Contains($"r1x{Environment.NewLine}r2", selection.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("s", selection.Text, StringComparison.Ordinal);
+        Assert.False(selection.Text.StartsWith('a'));
 
         selection.SelectParagraph(new Point(112, 40));
-        Assert.StartsWith("b", selection.Text, StringComparison.Ordinal);
-        Assert.DoesNotContain("TA", selection.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("r", selection.Text, StringComparison.Ordinal);
+        Assert.Contains("s", selection.Text, StringComparison.Ordinal);
+    }
+
+    // A page of plain text shaped like the school syllabus this was measured on: one line on its own, a two-line
+    // paragraph, then a short heading with a line of body text under it. Lines are 10 high, 2.5 apart inside a
+    // paragraph and 15 apart between paragraphs, all left-aligned in a column 200 wide.
+    private static TextGlyph[] Syllabus()
+    {
+        (string Text, double Top, double Right)[] rows =
+        [
+            ("fourth", 0, 200),
+            ("absent", 25, 200),
+            ("campbell", 37.5, 150),
+            ("food", 62.5, 40),
+            ("water", 75, 200),
+        ];
+
+        var glyphs = new List<TextGlyph>();
+        for (int line = 0; line < rows.Length; line++)
+        {
+            (string text, double top, double right) = rows[line];
+            double width = right / text.Length;
+            for (int i = 0; i < text.Length; i++)
+            {
+                glyphs.Add(new TextGlyph(text[i].ToString(), new Rect(i * width, top, width, 10), line, line));
+            }
+        }
+
+        return [.. glyphs];
+    }
+
+    [Theory]
+    [InlineData(5, "fourth")]            // a line with a blank line on either side is a paragraph of its own
+    [InlineData(30, "absent|campbell")]  // a wrapped paragraph, clicked on its first line
+    [InlineData(42, "absent|campbell")]  // the same paragraph, clicked on its last line
+    [InlineData(67, "food")]             // a heading stops short of the margin, so it stands alone
+    [InlineData(80, "water")]            // and the body under it does not reach back up into it
+    public void SelectParagraph_TakesOneParagraphOfPlainText(double y, string expected)
+    {
+        var selection = new TextSelection(Syllabus());
+        selection.SelectParagraph(new Point(20, y));
+
+        Assert.Equal(expected.Replace("|", Environment.NewLine, StringComparison.Ordinal), selection.Text);
     }
 
     [Fact]
