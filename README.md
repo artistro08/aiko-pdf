@@ -22,8 +22,6 @@ I built this because I wanted a simple PDF viewer that looked good. There is a
     <img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200" alt="Get it from Microsoft" />
 </a>
 
-That is it. Aiko PDF is in the Start menu and offered for PDFs under **Open with**.
-
 ## Building
 
 You need the .NET 9 SDK and the Visual Studio 2022 build tools for the XAML compiler.
