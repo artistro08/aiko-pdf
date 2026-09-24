@@ -22,7 +22,7 @@ I built this because I wanted a simple PDF viewer that looked good. There is a
     <img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200" alt="Get it from Microsoft" />
 </a>
 
-You can also install from the releases page.
+You can also install from the [releases page](https://github.com/artistro08/aiko-pdf/releases).
 
 ## Building
 
