@@ -13,21 +13,14 @@
 
 ![Aiko PDF with a document open](docs/screenshot.png)
 
-
 I built this because I wanted a simple PDF viewer that looked good. There is a
 [sample document](docs/sample.pdf) to test the viewer if you want.
 
 ## Installing
 
-Download `Aiko-<version>-x64.msix` and `Aiko.cer` from [Releases](https://github.com/artistro08/aiko-pdf/releases).
-
-The package isn't signed, so installing it by itself won't work. you have to install the cert first (only if you trust it of course).
-
-1. Double-click **Aiko.cer** and choose **Install Certificate**.
-2. Pick **Local Machine**, then **Yes** at the prompt for administrator rights.
-3. Choose **Place all certificates in the following store**, **Browse**, then **Trusted People**.
-4. **Next**, then **Finish**. Windows says the import succeeded.
-5. Double-click **Aiko-<version>-x64.msix** and choose **Install**.
+<a href="https://apps.microsoft.com/detail/9MXL507LV5GG">
+    <img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200" alt="Get it from Microsoft" />
+</a>
 
 That is it. Aiko PDF is in the Start menu and offered for PDFs under **Open with**.
 
